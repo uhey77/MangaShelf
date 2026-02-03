@@ -17,8 +17,6 @@
 - `task frontend:typecheck`
 - `task frontend:check`
 
-Taskfile を使う場合は Task (go-task) をインストールする。
-
 ## 設計方針
 - 初学者が追える読みやすさを重視する
 - UI は関数コンポーネント + hooks で組み立てる
