@@ -5,15 +5,17 @@
 - 現在リポジトリにはバックエンド実装はない
 
 ## 主要コマンド
-`frontend/` で実行。
-- `npm install`
-- `npm run dev`
-- `npm run build`
-- `npm run preview`
-- `npm run lint`
-- `npm run format`
-- `npm run format:check`
-- `npm run typecheck`
+リポジトリ直下で実行。
+- `task -l`
+- `task frontend:install`
+- `task frontend:dev`
+- `task frontend:build`
+- `task frontend:preview`
+- `task frontend:lint`
+- `task frontend:format`
+- `task frontend:format-check`
+- `task frontend:typecheck`
+- `task frontend:check`
 
 ## 設計方針
 - 初学者が追える読みやすさを重視する
