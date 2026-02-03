@@ -30,6 +30,7 @@
 │           └── figma/
 │               └── ImageWithFallback.tsx
 ├── .gitignore
+├── Taskfile.yml
 └── README.md
 ```
 
@@ -67,6 +68,7 @@
 | `frontend/src/components/figma/` | Figma 由来の部品を置くディレクトリ。 |
 | `frontend/src/components/figma/ImageWithFallback.tsx` | 画像読み込み失敗時のフォールバック付き画像コンポーネント。 |
 | `.gitignore` | Git の追跡対象外を定義。 |
+| `Taskfile.yml` | タスクランナー（Task）用のコマンド定義。 |
 | `README.md` | リポジトリの概要と構成説明。 |
 
 ## 技術スタック
@@ -83,3 +85,4 @@
 | フロントエンド | Prettier | フォーマッター | コード整形 |
 | フロントエンド | lucide-react | アイコン | Lucide の React 実装 |
 | フロントエンド | motion | アニメーション | Framer Motion ベース |
+| 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |

@@ -1,0 +1,65 @@
+version: '3'
+
+tasks:
+  default:
+    desc: 利用可能なタスクを表示
+    cmds:
+      - task -l
+    silent: true
+
+  frontend:install:
+    desc: フロントエンド依存関係をインストール
+    dir: frontend
+    cmds:
+      - npm install
+
+  frontend:dev:
+    desc: フロントエンド開発サーバーを起動
+    dir: frontend
+    cmds:
+      - npm run dev
+    interactive: true
+
+  frontend:build:
+    desc: フロントエンドを本番ビルド
+    dir: frontend
+    cmds:
+      - npm run build
+
+  frontend:preview:
+    desc: 本番ビルドをプレビュー
+    dir: frontend
+    cmds:
+      - npm run preview
+
+  frontend:lint:
+    desc: ESLint を実行
+    dir: frontend
+    cmds:
+      - npm run lint
+
+  frontend:format:
+    desc: Prettier でコード整形
+    dir: frontend
+    cmds:
+      - npm run format
+
+  frontend:format-check:
+    desc: Prettier の整形チェック
+    dir: frontend
+    cmds:
+      - npm run format:check
+
+  frontend:typecheck:
+    desc: TypeScript の型チェックを実行
+    dir: frontend
+    cmds:
+      - npm run typecheck
+
+  frontend:check:
+    desc: lint・型チェック・整形チェックを実行
+    dir: frontend
+    cmds:
+      - npm run lint
+      - npm run typecheck
+      - npm run format:check
