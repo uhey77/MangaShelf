@@ -7,15 +7,52 @@
 │       ├── epic.md
 │       ├── story.md
 │       └── task.md
+├── backend/
+│   ├── data/
+│   │   └── library.json
+│   ├── pyproject.toml
+│   ├── src/
+│   │   ├── main.py
+│   │   ├── application/
+│   │   │   ├── __init__.py
+│   │   │   ├── commands/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── delete_library_item.py
+│   │   │   │   └── upsert_library_item.py
+│   │   │   └── queries/
+│   │   │       ├── __init__.py
+│   │   │       ├── get_library.py
+│   │   │       └── search_books.py
+│   │   ├── domain/
+│   │   │   ├── __init__.py
+│   │   │   ├── errors.py
+│   │   │   ├── models.py
+│   │   │   ├── repositories.py
+│   │   │   ├── search.py
+│   │   │   └── services.py
+│   │   ├── infrastructure/
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   ├── persistence/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── json_library_repository.py
+│   │   │   └── search/
+│   │   │       ├── __init__.py
+│   │   │       └── ndl_opensearch_service.py
+│   │   └── presentation/
+│   │       ├── __init__.py
+│   │       ├── api.py
+│   │       ├── dependencies.py
+│   │       ├── schemas.py
+│   │       └── routers/
+│   │           ├── __init__.py
+│   │           ├── health.py
+│   │           ├── library.py
+│   │           └── search.py
+│   └── uv.lock
 ├── docs/
 │   ├── requirements.md
 │   └── tech-selection.md
-├── backend/
-│   ├── pyproject.toml
-│   ├── data/
-│   │   └── library.json
-│   └── src/
-│       └── main.py
 ├── frontend/
 │   ├── index.html
 │   ├── .eslintrc.cjs
@@ -35,12 +72,16 @@
 │       └── components/
 │           └── figma/
 │               └── ImageWithFallback.tsx
+├── skills/
+│   └── .gitkeep
 ├── .gitignore
+├── AGENTS.md
 ├── Taskfile.yml
 └── README.md
 ```
 
-`frontend/node_modules/` はツリーから省略しています。
+`node_modules/`, `.venv/`, `.mypy_cache/`, `.git/` は自動生成のため省略しています。
+
 
 ## 構成説明
 
@@ -51,15 +92,52 @@
 | `.github/ISSUE_TEMPLATE/epic.md` | Epic 用の Issue テンプレート。 |
 | `.github/ISSUE_TEMPLATE/story.md` | Story 用の Issue テンプレート。 |
 | `.github/ISSUE_TEMPLATE/task.md` | Task 用の Issue テンプレート。 |
+| `backend/` | Python のバックエンド API。 |
+| `backend/data/` | 本棚データの保存先。 |
+| `backend/data/library.json` | 本棚データのサンプルと保存ファイル。 |
+| `backend/pyproject.toml` | バックエンドの依存関係定義。 |
+| `backend/uv.lock` | uv のロックファイル。 |
+| `backend/src/` | バックエンドのソースコード。 |
+| `backend/src/main.py` | FastAPI のエントリポイント。 |
+| `backend/src/application/` | アプリケーション層（ユースケース）。 |
+| `backend/src/application/__init__.py` | アプリケーション層のパッケージ定義。 |
+| `backend/src/application/commands/` | コマンド（書き込みユースケース）。 |
+| `backend/src/application/commands/__init__.py` | コマンド層のパッケージ定義。 |
+| `backend/src/application/commands/delete_library_item.py` | 所持データ削除コマンド。 |
+| `backend/src/application/commands/upsert_library_item.py` | 所持データ追加・更新コマンド。 |
+| `backend/src/application/queries/` | クエリ（読み取りユースケース）。 |
+| `backend/src/application/queries/__init__.py` | クエリ層のパッケージ定義。 |
+| `backend/src/application/queries/get_library.py` | 所持データ取得クエリ。 |
+| `backend/src/application/queries/search_books.py` | 検索ユースケース。 |
+| `backend/src/domain/` | ドメイン層（エンティティ・リポジトリIF）。 |
+| `backend/src/domain/__init__.py` | ドメイン層のパッケージ定義。 |
+| `backend/src/domain/errors.py` | ドメイン例外定義。 |
+| `backend/src/domain/models.py` | ドメインモデル。 |
+| `backend/src/domain/repositories.py` | リポジトリ抽象。 |
+| `backend/src/domain/search.py` | 検索ドメインの型。 |
+| `backend/src/domain/services.py` | ドメインサービス抽象。 |
+| `backend/src/infrastructure/` | インフラ層（外部API・永続化）。 |
+| `backend/src/infrastructure/__init__.py` | インフラ層のパッケージ定義。 |
+| `backend/src/infrastructure/config.py` | 設定読み込み。 |
+| `backend/src/infrastructure/persistence/` | 永続化アダプタ。 |
+| `backend/src/infrastructure/persistence/__init__.py` | 永続化層のパッケージ定義。 |
+| `backend/src/infrastructure/persistence/json_library_repository.py` | JSON ファイル永続化。 |
+| `backend/src/infrastructure/search/` | 外部検索アダプタ。 |
+| `backend/src/infrastructure/search/__init__.py` | 検索アダプタのパッケージ定義。 |
+| `backend/src/infrastructure/search/ndl_opensearch_service.py` | NDL OpenSearch 連携。 |
+| `backend/src/presentation/` | プレゼンテーション層（API）。 |
+| `backend/src/presentation/__init__.py` | API 層のパッケージ定義。 |
+| `backend/src/presentation/api.py` | FastAPI アプリ生成。 |
+| `backend/src/presentation/dependencies.py` | DI 依存解決。 |
+| `backend/src/presentation/schemas.py` | API スキーマ定義。 |
+| `backend/src/presentation/routers/` | API ルータ群。 |
+| `backend/src/presentation/routers/__init__.py` | ルータパッケージ定義。 |
+| `backend/src/presentation/routers/health.py` | ヘルスチェック。 |
+| `backend/src/presentation/routers/library.py` | 本棚 API。 |
+| `backend/src/presentation/routers/search.py` | 検索 API。 |
 | `docs/` | 仕様・検討資料などのドキュメントを置くディレクトリ。 |
 | `docs/requirements.md` | 要件定義のメモ。 |
 | `docs/tech-selection.md` | 技術選定の理由・方針。 |
-| `backend/` | Python のバックエンド API。 |
-| `backend/pyproject.toml` | バックエンドの依存関係定義。 |
-| `backend/data/` | 本棚データの保存先。 |
-| `backend/data/library.json` | 本棚データのサンプルと保存ファイル。 |
-| `backend/src/` | バックエンドのソースコード。 |
-| `backend/src/main.py` | FastAPI のエントリポイント。 |
 | `frontend/` | フロントエンド（Vite + React + Tailwind）のルート。 |
 | `frontend/index.html` | Vite のエントリ HTML。 |
 | `frontend/.eslintrc.cjs` | ESLint 設定。 |
@@ -79,9 +157,13 @@
 | `frontend/src/components/` | UI コンポーネント群。 |
 | `frontend/src/components/figma/` | Figma 由来の部品を置くディレクトリ。 |
 | `frontend/src/components/figma/ImageWithFallback.tsx` | 画像読み込み失敗時のフォールバック付き画像コンポーネント。 |
+| `skills/` | Codex 用のスキルディレクトリ。 |
+| `skills/.gitkeep` | 空ディレクトリ維持用ファイル。 |
 | `.gitignore` | Git の追跡対象外を定義。 |
+| `AGENTS.md` | Codex エージェント向けの作業指示。 |
 | `Taskfile.yml` | タスクランナー（Task）用のコマンド定義。 |
 | `README.md` | リポジトリの概要と構成説明。 |
+
 
 ## 技術スタック
 
@@ -100,5 +182,6 @@
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | 国立国会図書館サーチ API を利用 |
+| 設計 | DDD / Clean / Onion / CQRS | 層分離 | バックエンド構成指針 |
 | 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
