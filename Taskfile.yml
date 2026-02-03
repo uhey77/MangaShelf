@@ -63,3 +63,16 @@ tasks:
       - npm run lint
       - npm run typecheck
       - npm run format:check
+
+  backend:install:
+    desc: バックエンド依存関係をインストール（uv + pyproject）
+    dir: backend
+    cmds:
+      - uv sync --no-install-project
+
+  backend:dev:
+    desc: バックエンド開発サーバーを起動
+    dir: backend
+    cmds:
+      - uv run --no-project uvicorn src.main:app --reload --port 8000
+    interactive: true

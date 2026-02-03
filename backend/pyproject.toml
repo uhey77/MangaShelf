@@ -1,0 +1,14 @@
+[project]
+name = "mangashelf-backend"
+version = "0.1.0"
+description = "MangaShelf backend API"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.111.0",
+  "uvicorn[standard]>=0.30.0",
+  "requests>=2.32.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

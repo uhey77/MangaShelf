@@ -10,6 +10,12 @@
 ├── docs/
 │   ├── requirements.md
 │   └── tech-selection.md
+├── backend/
+│   ├── pyproject.toml
+│   ├── data/
+│   │   └── library.json
+│   └── src/
+│       └── main.py
 ├── frontend/
 │   ├── index.html
 │   ├── .eslintrc.cjs
@@ -48,6 +54,12 @@
 | `docs/` | 仕様・検討資料などのドキュメントを置くディレクトリ。 |
 | `docs/requirements.md` | 要件定義のメモ。 |
 | `docs/tech-selection.md` | 技術選定の理由・方針。 |
+| `backend/` | Python のバックエンド API。 |
+| `backend/pyproject.toml` | バックエンドの依存関係定義。 |
+| `backend/data/` | 本棚データの保存先。 |
+| `backend/data/library.json` | 本棚データのサンプルと保存ファイル。 |
+| `backend/src/` | バックエンドのソースコード。 |
+| `backend/src/main.py` | FastAPI のエントリポイント。 |
 | `frontend/` | フロントエンド（Vite + React + Tailwind）のルート。 |
 | `frontend/index.html` | Vite のエントリ HTML。 |
 | `frontend/.eslintrc.cjs` | ESLint 設定。 |
@@ -85,4 +97,8 @@
 | フロントエンド | Prettier | フォーマッター | コード整形 |
 | フロントエンド | lucide-react | アイコン | Lucide の React 実装 |
 | フロントエンド | motion | アニメーション | Framer Motion ベース |
+| バックエンド | Python | API 実装 | FastAPI で構築 |
+| バックエンド | FastAPI | Web API | `/api` を提供 |
+| バックエンド | requests | 外部検索 | 国立国会図書館サーチ API を利用 |
+| 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
