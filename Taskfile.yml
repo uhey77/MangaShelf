@@ -74,5 +74,5 @@ tasks:
     desc: バックエンド開発サーバーを起動
     dir: backend
     cmds:
-      - uv run --no-project uvicorn src.main:app --reload --port 8000
+      - uv run --no-project uvicorn main:app --reload --port 8000 --app-dir src
     interactive: true
