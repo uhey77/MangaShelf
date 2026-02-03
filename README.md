@@ -12,6 +12,9 @@
 │   └── tech-selection.md
 ├── frontend/
 │   ├── index.html
+│   ├── .eslintrc.cjs
+│   ├── .prettierrc.cjs
+│   ├── .prettierignore
 │   ├── package.json
 │   ├── package-lock.json
 │   ├── postcss.config.cjs
@@ -46,6 +49,9 @@
 | `docs/tech-selection.md` | 技術選定の理由・方針。 |
 | `frontend/` | フロントエンド（Vite + React + Tailwind）のルート。 |
 | `frontend/index.html` | Vite のエントリ HTML。 |
+| `frontend/.eslintrc.cjs` | ESLint 設定。 |
+| `frontend/.prettierrc.cjs` | Prettier 設定。 |
+| `frontend/.prettierignore` | Prettier の除外設定。 |
 | `frontend/package.json` | フロントエンドの依存関係とスクリプト定義。 |
 | `frontend/package-lock.json` | npm のロックファイル。 |
 | `frontend/postcss.config.cjs` | PostCSS 設定。 |
@@ -73,5 +79,7 @@
 | フロントエンド | Tailwind CSS | スタイリング | ユーティリティクラス |
 | フロントエンド | PostCSS | CSS 変換 | Autoprefixer と併用 |
 | フロントエンド | Autoprefixer | ベンダープレフィックス付与 | PostCSS プラグイン |
+| フロントエンド | ESLint | リント | コード品質チェック |
+| フロントエンド | Prettier | フォーマッター | コード整形 |
 | フロントエンド | lucide-react | アイコン | Lucide の React 実装 |
 | フロントエンド | motion | アニメーション | Framer Motion ベース |
