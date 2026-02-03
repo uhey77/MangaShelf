@@ -19,3 +19,6 @@
 - 再利用コンポーネントは `frontend/src/components/`、Figma 由来は `frontend/src/components/figma/` に置く
 - `docs/requirements.md` の必須要件（検索・絞り込み・アプリ化）を優先する
 - `docs/tech-selection.md` は将来の方針。実装と不一致がある場合は現行コードを優先する
+
+## ドキュメント更新
+- ファイルやディレクトリを追加・変更した場合は `README.md` の「ディレクトリ構造」「構成説明」「技術スタック」に追記・更新する
