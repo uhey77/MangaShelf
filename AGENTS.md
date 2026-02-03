@@ -10,6 +10,10 @@
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
+- `npm run lint`
+- `npm run format`
+- `npm run format:check`
+- `npm run typecheck`
 
 ## 設計方針
 - 初学者が追える読みやすさを重視する
