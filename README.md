@@ -114,7 +114,7 @@
 | `backend/src/domain/errors.py` | ドメイン例外定義。 |
 | `backend/src/domain/models.py` | ドメインモデル。 |
 | `backend/src/domain/repositories.py` | リポジトリ抽象。 |
-| `backend/src/domain/search.py` | 検索ドメインの型。 |
+| `backend/src/domain/search.py` | 検索ドメインの型（検索期間は `date`）。 |
 | `backend/src/domain/services.py` | ドメインサービス抽象。 |
 | `backend/src/infrastructure/` | インフラ層（外部API・永続化）。 |
 | `backend/src/infrastructure/__init__.py` | インフラ層のパッケージ定義。 |
@@ -182,6 +182,7 @@
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | 国立国会図書館サーチ API を利用 |
+| バックエンド | datetime (標準ライブラリ) | 日付型 | 検索期間に `date` を利用 |
 | 設計 | DDD / Clean / Onion / CQRS | 層分離 | バックエンド構成指針 |
 | 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
