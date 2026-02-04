@@ -1,5 +1,8 @@
 # AGENTS.md
 
+## 応答方針
+- 回答は日本語で行うこと。
+
 ## プロジェクト概要
 - MangaShelf のフロントエンドは `frontend/` 配下（Vite + React + TypeScript + Tailwind）
 - 現在リポジトリにはバックエンド実装はない
