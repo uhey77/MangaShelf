@@ -237,3 +237,15 @@
 | 設計 | DDD / Clean / Onion / CQRS | 層分離 | バックエンド構成指針 |
 | 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
+
+
+## コード設計の思想
+
+MangaShelf は保守性と学びやすさを重視し、バックエンドと同様にフロントエンドでも DDD / クリーンアーキテクチャ / オニオンアーキテクチャ / CQRS を意識した層構造を採用しています。
+
+- **依存方向は内向き**: `presentation` → `application` → `domain` の依存だけを許容し、`domain` は外部実装に依存しません。
+- **CQRS の分離**: 読み取りは `application/queries`、書き込みは `application/commands` に分割し、UI 側の責務を明確化しています。
+- **DTO 変換の集中**: API 由来の DTO とドメイン型の変換は `infrastructure/mappers` に集約します。
+- **インフラの差し替え容易性**: `domain/repositories` の抽象に対して `infrastructure/repositories` が実装を持ちます。
+- **UI は薄く、hooks に集約**: 状態管理やユースケース呼び出しは `presentation/hooks` にまとめ、UI は描画に専念します。
+- **DI による組み立て**: `infrastructure/di` でリポジトリとユースケースを組み立て、`presentation/providers` から注入します。
