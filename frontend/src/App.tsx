@@ -103,10 +103,7 @@ export default function App() {
 
   const toggleTheme = () => setIsDark(!isDark);
 
-  const libraryIndex = useMemo(
-    () => new Map(library.map((item) => [item.id, item])),
-    [library]
-  );
+  const libraryIndex = useMemo(() => new Map(library.map((item) => [item.id, item])), [library]);
 
   const hasSearchCondition = useMemo(
     () => Object.values(searchForm).some((value) => value.trim().length > 0),
@@ -184,6 +181,11 @@ export default function App() {
     setSearchTotal(0);
     setSearchPage(1);
     setSearchError(null);
+  };
+
+  const selectSeriesFromSearch = (item: MangaSeries) => {
+    const saved = libraryIndex.get(item.id);
+    setSelectedSeries(saved ?? item);
   };
 
   const updateSeries = async (updated: MangaSeries) => {
@@ -278,18 +280,14 @@ export default function App() {
                     placeholder="タイトル"
                     className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
                     value={searchForm.title}
-                    onChange={(e) =>
-                      setSearchForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, title: e.target.value }))}
                   />
                   <input
                     type="text"
                     placeholder="著者"
                     className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
                     value={searchForm.author}
-                    onChange={(e) =>
-                      setSearchForm((prev) => ({ ...prev, author: e.target.value }))
-                    }
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, author: e.target.value }))}
                   />
                   <input
                     type="text"
@@ -314,9 +312,7 @@ export default function App() {
                     aria-label="発売日（終了）"
                     className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
                     value={searchForm.until}
-                    onChange={(e) =>
-                      setSearchForm((prev) => ({ ...prev, until: e.target.value }))
-                    }
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, until: e.target.value }))}
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -420,7 +416,7 @@ export default function App() {
                             <SeriesCard
                               key={item.id}
                               item={item}
-                              onClick={() => setSelectedSeries(item)}
+                              onClick={() => selectSeriesFromSearch(item)}
                               isDark={isDark}
                               statusLabel={isInLibrary ? '所持' : '未所持'}
                               statusTone={isInLibrary ? 'owned' : 'missing'}
@@ -567,9 +563,7 @@ function SeriesCard({
   const metaLine = buildMetaLine(item.publisher, item.publishedDate);
 
   const statusStyle =
-    statusTone === 'owned'
-      ? 'bg-emerald-50 text-emerald-600'
-      : 'bg-amber-50 text-amber-600';
+    statusTone === 'owned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
 
   return (
     <motion.div
@@ -578,7 +572,11 @@ function SeriesCard({
       className={`flex gap-4 p-3 rounded-2xl border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'} cursor-pointer`}
     >
       <div className="w-20 h-28 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-200 dark:bg-zinc-800">
-        <ImageWithFallback src={item.coverUrl} alt={item.title} className="w-full h-full object-cover" />
+        <ImageWithFallback
+          src={item.coverUrl}
+          alt={item.title}
+          className="w-full h-full object-cover"
+        />
       </div>
       <div className="flex-1 flex flex-col justify-between min-w-0">
         <div>
@@ -700,7 +698,11 @@ function SeriesDetail({
         {/* Info Card */}
         <div className="flex gap-4">
           <div className="w-28 h-40 rounded-xl overflow-hidden shadow-lg flex-shrink-0">
-            <ImageWithFallback src={series.coverUrl} alt={series.title} className="w-full h-full object-cover" />
+            <ImageWithFallback
+              src={series.coverUrl}
+              alt={series.title}
+              className="w-full h-full object-cover"
+            />
           </div>
           <div className="flex flex-col justify-center">
             <h3 className="text-lg font-bold">{series.title}</h3>
@@ -748,7 +750,10 @@ function SeriesDetail({
                 {series.ownedVolumes.length}/{series.latestVolume}
               </span>
             </h4>
-            <button onClick={toggleAll} className="text-xs font-medium text-blue-500 hover:underline">
+            <button
+              onClick={toggleAll}
+              className="text-xs font-medium text-blue-500 hover:underline"
+            >
               {series.ownedVolumes.length === series.latestVolume
                 ? 'すべて未購入にする'
                 : 'すべて購入済みにする'}
