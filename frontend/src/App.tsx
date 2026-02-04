@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Library,
@@ -16,7 +16,10 @@ import {
   StickyNote,
   ChevronLeft,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  X,
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
@@ -26,92 +29,206 @@ interface MangaSeries {
   id: string;
   title: string;
   author: string;
+  publisher?: string | null;
+  publishedDate?: string | null;
   latestVolume: number;
   ownedVolumes: number[];
-  nextReleaseDate?: string;
+  nextReleaseDate?: string | null;
   isFavorite: boolean;
   notes: string;
   coverUrl: string;
   genre: string[];
+  isbn?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
 }
 
-// --- Mock Data ---
-const INITIAL_DATA: MangaSeries[] = [
-  {
-    id: '1',
-    title: '海辺のアドベンチャー',
-    author: '山田 太郎',
-    latestVolume: 12,
-    ownedVolumes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    nextReleaseDate: '2026-03-15',
-    isFavorite: true,
-    notes: '5巻のラストシーンが最高。',
-    coverUrl: 'https://images.unsplash.com/photo-1695671548955-74a180b8777d?q=80&w=400',
-    genre: ['冒険', 'ファンタジー']
-  },
-  {
-    id: '2',
-    title: '都会の静寂',
-    author: '佐藤 花子',
-    latestVolume: 5,
-    ownedVolumes: [1, 2, 3, 4, 5],
-    nextReleaseDate: '2026-05-20',
-    isFavorite: false,
-    notes: '読んでいると落ち着く。',
-    coverUrl: 'https://images.unsplash.com/photo-1705927450843-3c1abe9b17d6?q=80&w=400',
-    genre: ['日常', 'ドラマ']
-  },
-  {
-    id: '3',
-    title: 'ネオン・ナイト',
-    author: '田中 二郎',
-    latestVolume: 8,
-    ownedVolumes: [1, 2, 3],
-    nextReleaseDate: '2026-02-10',
-    isFavorite: false,
-    notes: '3巻まで購入済み。続きが気になる。',
-    coverUrl: 'https://images.unsplash.com/photo-1627905644737-c10eef6c542d?q=80&w=400',
-    genre: ['SF', 'アクション']
-  }
-];
+interface SearchResponse {
+  items: MangaSeries[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
-// --- Components ---
+interface SearchFormState {
+  q: string;
+  title: string;
+  author: string;
+  publisher: string;
+  from: string;
+  until: string;
+}
+
+const DEFAULT_SEARCH_FORM: SearchFormState = {
+  q: '',
+  title: '',
+  author: '',
+  publisher: '',
+  from: '',
+  until: ''
+};
 
 const ThemeContext = React.createContext({
   isDark: false,
   toggleTheme: () => {}
 });
 
+const formatDate = (value?: string | null) => {
+  if (!value) return '';
+  return value.replace(/-/g, '/');
+};
+
+const buildMetaLine = (publisher?: string | null, publishedDate?: string | null) => {
+  const parts = [publisher, formatDate(publishedDate)].filter(Boolean);
+  return parts.join(' / ');
+};
+
 export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [activeTab, setActiveTab] = useState<'shelf' | 'search' | 'favorites' | 'settings'>(
     'shelf'
   );
-  const [series, setSeries] = useState<MangaSeries[]>(INITIAL_DATA);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [library, setLibrary] = useState<MangaSeries[]>([]);
+  const [libraryQuery, setLibraryQuery] = useState('');
   const [selectedSeries, setSelectedSeries] = useState<MangaSeries | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+
+  const [searchForm, setSearchForm] = useState<SearchFormState>(DEFAULT_SEARCH_FORM);
+  const [searchResults, setSearchResults] = useState<MangaSeries[]>([]);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const searchLimit = 20;
 
   const toggleTheme = () => setIsDark(!isDark);
 
-  const filteredSeries = useMemo(() => {
-    let result = series;
-    if (searchQuery) {
-      result = result.filter(
-        (s) =>
-          s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.author.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const libraryIndex = useMemo(() => new Map(library.map((item) => [item.id, item])), [library]);
+
+  const hasSearchCondition = useMemo(
+    () => Object.values(searchForm).some((value) => value.trim().length > 0),
+    [searchForm]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadLibrary = async () => {
+      try {
+        const response = await fetch('/api/library', { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error('Failed to load library');
+        }
+        const data = (await response.json()) as MangaSeries[];
+        setLibrary(data);
+        setLibraryError(null);
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
+        setLibraryError('本棚データの読み込みに失敗しました');
+      }
+    };
+
+    loadLibrary();
+    return () => controller.abort();
+  }, []);
+
+  const handleSearch = async (page = 1) => {
+    if (!hasSearchCondition) {
+      setSearchResults([]);
+      setSearchTotal(0);
+      setSearchPage(1);
+      setSearchError(null);
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError(null);
+
+    const params = new URLSearchParams();
+    if (searchForm.q.trim()) params.set('q', searchForm.q.trim());
+    if (searchForm.title.trim()) params.set('title', searchForm.title.trim());
+    if (searchForm.author.trim()) params.set('author', searchForm.author.trim());
+    if (searchForm.publisher.trim()) params.set('publisher', searchForm.publisher.trim());
+    if (searchForm.from.trim()) params.set('from', searchForm.from.trim());
+    if (searchForm.until.trim()) params.set('until', searchForm.until.trim());
+    params.set('page', String(page));
+    params.set('limit', String(searchLimit));
+
+    try {
+      const response = await fetch(`/api/search?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      const data = (await response.json()) as SearchResponse;
+      setSearchResults(data.items);
+      setSearchTotal(data.total);
+      setSearchPage(data.page);
+    } catch {
+      setSearchError('検索に失敗しました');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    handleSearch(1);
+  };
+
+  const clearSearch = () => {
+    setSearchForm(DEFAULT_SEARCH_FORM);
+    setSearchResults([]);
+    setSearchTotal(0);
+    setSearchPage(1);
+    setSearchError(null);
+  };
+
+  const selectSeriesFromSearch = (item: MangaSeries) => {
+    const saved = libraryIndex.get(item.id);
+    setSelectedSeries(saved ?? item);
+  };
+
+  const updateSeries = async (updated: MangaSeries) => {
+    try {
+      const response = await fetch('/api/library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+      if (!response.ok) {
+        throw new Error('Failed to save');
+      }
+      const saved = (await response.json()) as MangaSeries;
+      setLibrary((prev) => {
+        const exists = prev.some((item) => item.id === saved.id);
+        if (!exists) return [...prev, saved];
+        return prev.map((item) => (item.id === saved.id ? saved : item));
+      });
+      setSelectedSeries(saved);
+      setLibraryError(null);
+    } catch {
+      setLibraryError('本棚への保存に失敗しました');
+    }
+  };
+
+  const filteredLibrary = useMemo(() => {
+    let result = library;
+    if (libraryQuery.trim()) {
+      const query = libraryQuery.toLowerCase();
+      result = result.filter((item) => {
+        const title = item.title.toLowerCase();
+        const author = item.author.toLowerCase();
+        const publisher = item.publisher?.toLowerCase() ?? '';
+        return title.includes(query) || author.includes(query) || publisher.includes(query);
+      });
     }
     if (activeTab === 'favorites') {
-      result = result.filter((s) => s.isFavorite);
+      result = result.filter((item) => item.isFavorite);
     }
     return result;
-  }, [series, searchQuery, activeTab]);
+  }, [library, libraryQuery, activeTab]);
 
-  const updateSeries = (updated: MangaSeries) => {
-    setSeries((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    setSelectedSeries(updated);
-  };
+  const totalSearchPages = Math.max(1, Math.ceil(Math.min(searchTotal, 500) / searchLimit));
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>
@@ -129,22 +246,127 @@ export default function App() {
           </button>
         </header>
 
-        {/* Search Bar (Static on Shelf/Search/Fav tabs) */}
+        {/* Search Area */}
         {activeTab !== 'settings' && !selectedSeries && (
-          <div className="px-4 py-3">
-            <div className="relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="作品名・作者で検索"
-                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none transition-all`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+          <div className="px-4 py-3 space-y-3">
+            {activeTab === 'search' ? (
+              <form onSubmit={handleSearchSubmit} className="space-y-3">
+                <div className="relative">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                    size={18}
+                  />
+                  <input
+                    type="text"
+                    placeholder="キーワード検索"
+                    className={`w-full pl-10 pr-10 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none transition-all`}
+                    value={searchForm.q}
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, q: e.target.value }))}
+                  />
+                  {searchForm.q && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchForm((prev) => ({ ...prev, q: '' }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                      aria-label="キーワードをクリア"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="タイトル"
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                    value={searchForm.title}
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, title: e.target.value }))}
+                  />
+                  <input
+                    type="text"
+                    placeholder="著者"
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                    value={searchForm.author}
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, author: e.target.value }))}
+                  />
+                  <input
+                    type="text"
+                    placeholder="出版社"
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                    value={searchForm.publisher}
+                    onChange={(e) =>
+                      setSearchForm((prev) => ({ ...prev, publisher: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    aria-label="発売日（開始）"
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                    value={searchForm.from}
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, from: e.target.value }))}
+                  />
+                  <input
+                    type="date"
+                    aria-label="発売日（終了）"
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                    value={searchForm.until}
+                    onChange={(e) => setSearchForm((prev) => ({ ...prev, until: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={!hasSearchCondition || searchLoading}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${hasSearchCondition ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-zinc-200 text-zinc-500'} ${searchLoading ? 'opacity-70' : ''}`}
+                  >
+                    {searchLoading ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={16} /> 検索中
+                      </span>
+                    ) : (
+                      '検索する'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium border ${isDark ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-900' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100'} transition-colors`}
+                  >
+                    クリア
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span>データ提供: 国立国会図書館サーチ</span>
+                  <span>{hasSearchCondition ? `${searchTotal}件` : '検索条件を入力'}</span>
+                </div>
+              </form>
+            ) : (
+              <div className="relative">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="本棚内を検索"
+                  className={`w-full pl-10 pr-10 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none transition-all`}
+                  value={libraryQuery}
+                  onChange={(e) => setLibraryQuery(e.target.value)}
+                />
+                {libraryQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setLibraryQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    aria-label="検索をクリア"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -161,9 +383,78 @@ export default function App() {
               >
                 {activeTab === 'settings' ? (
                   <SettingsView />
+                ) : activeTab === 'search' ? (
+                  <div className="space-y-4">
+                    {searchError && (
+                      <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm">
+                        {searchError}
+                      </div>
+                    )}
+                    {searchLoading && searchResults.length === 0 && (
+                      <div className="py-16 text-center text-zinc-500">
+                        <Loader2 className="mx-auto mb-2 animate-spin" size={32} />
+                        <p>検索しています...</p>
+                      </div>
+                    )}
+                    {!searchLoading && searchResults.length === 0 && hasSearchCondition && (
+                      <div className="py-20 text-center text-zinc-500">
+                        <Library className="mx-auto mb-2 opacity-20" size={48} />
+                        <p>検索結果が見つかりませんでした</p>
+                      </div>
+                    )}
+                    {!searchLoading && searchResults.length === 0 && !hasSearchCondition && (
+                      <div className="py-20 text-center text-zinc-500">
+                        <Search className="mx-auto mb-2 opacity-20" size={48} />
+                        <p>検索条件を入力してください</p>
+                      </div>
+                    )}
+                    {searchResults.length > 0 && (
+                      <div className="grid grid-cols-1 gap-4">
+                        {searchResults.map((item) => {
+                          const isInLibrary = libraryIndex.has(item.id);
+                          return (
+                            <SeriesCard
+                              key={item.id}
+                              item={item}
+                              onClick={() => selectSeriesFromSearch(item)}
+                              isDark={isDark}
+                              statusLabel={isInLibrary ? '所持' : '未所持'}
+                              statusTone={isInLibrary ? 'owned' : 'missing'}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                    {searchResults.length > 0 && totalSearchPages > 1 && (
+                      <div className="flex items-center justify-between text-sm text-zinc-500">
+                        <button
+                          onClick={() => handleSearch(searchPage - 1)}
+                          disabled={searchPage === 1 || searchLoading}
+                          className={`px-3 py-1 rounded-lg border ${isDark ? 'border-zinc-800' : 'border-zinc-200'} disabled:opacity-40`}
+                        >
+                          前へ
+                        </button>
+                        <span>
+                          {searchPage} / {totalSearchPages}
+                        </span>
+                        <button
+                          onClick={() => handleSearch(searchPage + 1)}
+                          disabled={searchPage >= totalSearchPages || searchLoading}
+                          className={`px-3 py-1 rounded-lg border ${isDark ? 'border-zinc-800' : 'border-zinc-200'} disabled:opacity-40`}
+                        >
+                          次へ
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
-                    {filteredSeries.map((item) => (
+                    {libraryError && (
+                      <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm">
+                        {libraryError}
+                      </div>
+                    )}
+                    {filteredLibrary.map((item) => (
                       <SeriesCard
                         key={item.id}
                         item={item}
@@ -171,7 +462,7 @@ export default function App() {
                         isDark={isDark}
                       />
                     ))}
-                    {filteredSeries.length === 0 && (
+                    {filteredLibrary.length === 0 && (
                       <div className="py-20 text-center text-zinc-500">
                         <Library className="mx-auto mb-2 opacity-20" size={48} />
                         <p>作品が見つかりませんでした</p>
@@ -186,6 +477,7 @@ export default function App() {
                 onBack={() => setSelectedSeries(null)}
                 onUpdate={updateSeries}
                 isDark={isDark}
+                isInLibrary={libraryIndex.has(selectedSeries.id)}
               />
             )}
           </AnimatePresence>
@@ -256,14 +548,22 @@ function NavButton({
 function SeriesCard({
   item,
   onClick,
-  isDark
+  isDark,
+  statusLabel,
+  statusTone
 }: {
   item: MangaSeries;
   onClick: () => void;
   isDark: boolean;
+  statusLabel?: string;
+  statusTone?: 'owned' | 'missing';
 }) {
   const lastOwned = Math.max(...item.ownedVolumes, 0);
-  const isUpToDate = lastOwned === item.latestVolume;
+  const isUpToDate = lastOwned === item.latestVolume && item.latestVolume > 0;
+  const metaLine = buildMetaLine(item.publisher, item.publishedDate);
+
+  const statusStyle =
+    statusTone === 'owned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
 
   return (
     <motion.div
@@ -282,11 +582,19 @@ function SeriesCard({
         <div>
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-bold truncate">{item.title}</h3>
-            {item.isFavorite && (
-              <Heart size={16} className="text-red-500 fill-red-500 flex-shrink-0" />
-            )}
+            <div className="flex items-center gap-2">
+              {statusLabel && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusStyle}`}>
+                  {statusLabel}
+                </span>
+              )}
+              {item.isFavorite && (
+                <Heart size={16} className="text-red-500 fill-red-500 flex-shrink-0" />
+              )}
+            </div>
           </div>
           <p className="text-xs text-zinc-500 truncate">{item.author}</p>
+          {metaLine && <p className="text-[11px] text-zinc-400 truncate">{metaLine}</p>}
           <div className="mt-2 flex flex-wrap gap-1">
             {item.genre.map((g) => (
               <span
@@ -317,7 +625,7 @@ function SeriesCard({
               className={`text-[10px] px-2 py-1 rounded-full ${isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'} flex items-center gap-1`}
             >
               <Calendar size={10} />
-              {item.nextReleaseDate.replace(/-/g, '/')} 次巻
+              {formatDate(item.nextReleaseDate)} 次巻
             </div>
           )}
         </div>
@@ -330,14 +638,20 @@ function SeriesDetail({
   series,
   onBack,
   onUpdate,
-  isDark
+  isDark,
+  isInLibrary
 }: {
   series: MangaSeries;
   onBack: () => void;
   onUpdate: (s: MangaSeries) => void;
   isDark: boolean;
+  isInLibrary: boolean;
 }) {
   const [noteText, setNoteText] = useState(series.notes);
+
+  useEffect(() => {
+    setNoteText(series.notes);
+  }, [series.id, series.notes]);
 
   const toggleVolume = (vol: number) => {
     let newOwned = [...series.ownedVolumes];
@@ -393,10 +707,36 @@ function SeriesDetail({
           <div className="flex flex-col justify-center">
             <h3 className="text-lg font-bold">{series.title}</h3>
             <p className="text-zinc-500">{series.author}</p>
-            <div className="mt-3 flex gap-2">
-              <button className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors">
-                購入ページへ <ExternalLink size={12} />
-              </button>
+            {buildMetaLine(series.publisher, series.publishedDate) && (
+              <p className="text-xs text-zinc-500 mt-1">
+                {buildMetaLine(series.publisher, series.publishedDate)}
+              </p>
+            )}
+            {series.isbn && <p className="text-xs text-zinc-400 mt-1">ISBN: {series.isbn}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {series.sourceUrl && (
+                <a
+                  href={series.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors"
+                >
+                  NDLで見る <ExternalLink size={12} />
+                </a>
+              )}
+              {!isInLibrary && (
+                <button
+                  onClick={() => onUpdate({ ...series })}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-emerald-500 text-white font-medium hover:bg-emerald-600 transition-colors"
+                >
+                  本棚に追加 <Plus size={12} />
+                </button>
+              )}
+              {isInLibrary && (
+                <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600">
+                  本棚に追加済み
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -448,9 +788,7 @@ function SeriesDetail({
                 <Bell size={20} className="text-amber-500" />
                 <div>
                   <p className="text-xs font-medium text-amber-600">次巻発売予定</p>
-                  <p className="text-sm font-bold">
-                    {series.nextReleaseDate.replace(/-/g, '.')} (予定)
-                  </p>
+                  <p className="text-sm font-bold">{formatDate(series.nextReleaseDate)} (予定)</p>
                 </div>
               </div>
               <button className="text-xs font-bold text-amber-600 underline">予約する</button>
@@ -520,6 +858,17 @@ function SettingsView() {
             icon={<Filter size={20} className="text-zinc-400" />}
             title="表示設定"
             description="巻数の並び順やグリッド数"
+          />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">データ</h3>
+        <div className="space-y-2">
+          <SettingsItem
+            icon={<Library size={18} className="text-zinc-400" />}
+            title="データソース"
+            description="国立国会図書館サーチ API"
           />
         </div>
       </section>

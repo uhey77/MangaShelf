@@ -7,6 +7,12 @@ tasks:
       - task -l
     silent: true
 
+  check:
+    desc: バックエンド・フロントエンドのチェックを実行
+    cmds:
+      - task backend:check
+      - task frontend:check
+
   frontend:install:
     desc: フロントエンド依存関係をインストール
     dir: frontend
@@ -63,3 +69,48 @@ tasks:
       - npm run lint
       - npm run typecheck
       - npm run format:check
+
+  backend:install:
+    desc: バックエンド依存関係をインストール（uv + pyproject）
+    dir: backend
+    cmds:
+      - uv sync --no-install-project
+
+  backend:dev:
+    desc: バックエンド開発サーバーを起動
+    dir: backend
+    cmds:
+      - uv run --no-project uvicorn main:app --reload --port 8000 --app-dir src
+    interactive: true
+
+  backend:lint:
+    desc: Ruff でリントを実行
+    dir: backend
+    cmds:
+      - uv run ruff check src
+
+  backend:format:
+    desc: Ruff でコード整形
+    dir: backend
+    cmds:
+      - uv run ruff format src
+
+  backend:format-check:
+    desc: Ruff の整形チェック
+    dir: backend
+    cmds:
+      - uv run ruff format --check src
+
+  backend:typecheck:
+    desc: ty で型チェックを実行
+    dir: backend
+    cmds:
+      - uv run ty check src
+
+  backend:check:
+    desc: lint・型チェック・整形チェックを実行
+    dir: backend
+    cmds:
+      - uv run ruff check src
+      - uv run ty check src
+      - uv run ruff format --check src
