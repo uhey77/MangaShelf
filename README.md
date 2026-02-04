@@ -66,12 +66,44 @@
 │   ├── tsconfig.node.json
 │   ├── vite.config.ts
 │   └── src/
-│       ├── App.tsx
+│       ├── domain/
+│       │   ├── entities/
+│       │   │   └── MangaSeries.ts
+│       │   ├── repositories/
+│       │   │   ├── LibraryRepository.ts
+│       │   │   └── SearchRepository.ts
+│       │   └── search.ts
+│       ├── application/
+│       │   ├── commands/
+│       │   │   ├── DeleteLibraryItem.ts
+│       │   │   └── UpsertLibraryItem.ts
+│       │   └── queries/
+│       │       ├── GetLibrary.ts
+│       │       └── SearchBooks.ts
+│       ├── infrastructure/
+│       │   ├── di/
+│       │   │   └── createAppContainer.ts
+│       │   ├── http/
+│       │   │   └── fetchJson.ts
+│       │   ├── mappers/
+│       │   │   └── libraryMapper.ts
+│       │   └── repositories/
+│       │       ├── LibraryApiRepository.ts
+│       │       └── SearchApiRepository.ts
+│       ├── presentation/
+│       │   ├── hooks/
+│       │   │   ├── useLibrary.ts
+│       │   │   └── useSearch.ts
+│       │   ├── providers/
+│       │   │   └── AppProvider.tsx
+│       │   ├── utils/
+│       │   │   └── formatters.ts
+│       │   └── App.tsx
+│       ├── components/
+│       │   └── figma/
+│       │       └── ImageWithFallback.tsx
 │       ├── main.tsx
-│       ├── index.css
-│       └── components/
-│           └── figma/
-│               └── ImageWithFallback.tsx
+│       └── index.css
 ├── skills/
 │   └── .gitkeep
 ├── .gitignore
@@ -151,13 +183,29 @@
 | `frontend/tsconfig.json` | フロントエンドの TypeScript 設定。 |
 | `frontend/tsconfig.node.json` | Vite 設定向けの TypeScript 設定。 |
 | `frontend/vite.config.ts` | Vite の設定。 |
-| `frontend/src/` | React アプリのソースコード。 |
-| `frontend/src/App.tsx` | 画面全体のメインコンポーネント。 |
-| `frontend/src/main.tsx` | React のエントリポイント。 |
-| `frontend/src/index.css` | Tailwind の読み込みを含むグローバル CSS。 |
+| `frontend/src/` | React アプリのソースコード（DDD/CQRS 構成）。 |
+| `frontend/src/domain/` | ドメイン層（エンティティ・リポジトリIF）。 |
+| `frontend/src/domain/entities/` | ドメインエンティティ定義。 |
+| `frontend/src/domain/repositories/` | リポジトリ抽象。 |
+| `frontend/src/domain/search.ts` | 検索クエリ・検索結果の型。 |
+| `frontend/src/application/` | アプリケーション層（ユースケース）。 |
+| `frontend/src/application/commands/` | コマンド（書き込みユースケース）。 |
+| `frontend/src/application/queries/` | クエリ（読み取りユースケース）。 |
+| `frontend/src/infrastructure/` | インフラ層（API 連携・DTO 変換）。 |
+| `frontend/src/infrastructure/di/` | フロントエンドの DI 構成。 |
+| `frontend/src/infrastructure/http/` | fetch 共通処理。 |
+| `frontend/src/infrastructure/mappers/` | API DTO とドメイン型の変換。 |
+| `frontend/src/infrastructure/repositories/` | API 実装リポジトリ。 |
+| `frontend/src/presentation/` | プレゼンテーション層（UI）。 |
+| `frontend/src/presentation/App.tsx` | 画面全体のメインコンポーネント。 |
+| `frontend/src/presentation/hooks/` | UI 向け hooks。 |
+| `frontend/src/presentation/providers/` | DI コンテナの Provider。 |
+| `frontend/src/presentation/utils/` | 表示用ユーティリティ。 |
 | `frontend/src/components/` | UI コンポーネント群。 |
 | `frontend/src/components/figma/` | Figma 由来の部品を置くディレクトリ。 |
 | `frontend/src/components/figma/ImageWithFallback.tsx` | 画像読み込み失敗時のフォールバック付き画像コンポーネント。 |
+| `frontend/src/main.tsx` | React のエントリポイント。 |
+| `frontend/src/index.css` | Tailwind の読み込みを含むグローバル CSS。 |
 | `skills/` | Codex 用のスキルディレクトリ。 |
 | `skills/.gitkeep` | 空ディレクトリ維持用ファイル。 |
 | `.gitignore` | Git の追跡対象外を定義。 |

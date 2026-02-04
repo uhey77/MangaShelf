@@ -22,193 +22,57 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ImageWithFallback } from './components/figma/ImageWithFallback';
 
-// --- Types ---
-interface MangaSeries {
-  id: string;
-  title: string;
-  author: string;
-  publisher?: string | null;
-  publishedDate?: string | null;
-  latestVolume: number;
-  ownedVolumes: number[];
-  nextReleaseDate?: string | null;
-  isFavorite: boolean;
-  notes: string;
-  coverUrl: string;
-  genre: string[];
-  isbn?: string | null;
-  source?: string | null;
-  sourceUrl?: string | null;
-}
-
-interface SearchResponse {
-  items: MangaSeries[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-interface SearchFormState {
-  q: string;
-  title: string;
-  author: string;
-  publisher: string;
-  from: string;
-  until: string;
-}
-
-const DEFAULT_SEARCH_FORM: SearchFormState = {
-  q: '',
-  title: '',
-  author: '',
-  publisher: '',
-  from: '',
-  until: ''
-};
+import { MangaSeries } from '@domain/entities/MangaSeries';
+import { ImageWithFallback } from '@components/figma/ImageWithFallback';
+import { useLibrary } from '@presentation/hooks/useLibrary';
+import { useSearch } from '@presentation/hooks/useSearch';
+import { buildMetaLine, formatDate } from '@presentation/utils/formatters';
 
 const ThemeContext = React.createContext({
   isDark: false,
   toggleTheme: () => {}
 });
 
-const formatDate = (value?: string | null) => {
-  if (!value) return '';
-  return value.replace(/-/g, '/');
-};
-
-const buildMetaLine = (publisher?: string | null, publishedDate?: string | null) => {
-  const parts = [publisher, formatDate(publishedDate)].filter(Boolean);
-  return parts.join(' / ');
-};
-
 export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [activeTab, setActiveTab] = useState<'shelf' | 'search' | 'favorites' | 'settings'>(
     'shelf'
   );
-  const [library, setLibrary] = useState<MangaSeries[]>([]);
   const [libraryQuery, setLibraryQuery] = useState('');
   const [selectedSeries, setSelectedSeries] = useState<MangaSeries | null>(null);
-  const [libraryError, setLibraryError] = useState<string | null>(null);
 
-  const [searchForm, setSearchForm] = useState<SearchFormState>(DEFAULT_SEARCH_FORM);
-  const [searchResults, setSearchResults] = useState<MangaSeries[]>([]);
-  const [searchTotal, setSearchTotal] = useState(0);
-  const [searchPage, setSearchPage] = useState(1);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const searchLimit = 20;
+  const { library, libraryError, updateSeries } = useLibrary();
+  const {
+    searchForm,
+    setSearchForm,
+    searchResults,
+    searchTotal,
+    searchPage,
+    searchLoading,
+    searchError,
+    searchLimit,
+    hasSearchCondition,
+    handleSearch,
+    handleSearchSubmit,
+    clearSearch
+  } = useSearch();
 
   const toggleTheme = () => setIsDark(!isDark);
 
   const libraryIndex = useMemo(() => new Map(library.map((item) => [item.id, item])), [library]);
-
-  const hasSearchCondition = useMemo(
-    () => Object.values(searchForm).some((value) => value.trim().length > 0),
-    [searchForm]
-  );
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadLibrary = async () => {
-      try {
-        const response = await fetch('/api/library', { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error('Failed to load library');
-        }
-        const data = (await response.json()) as MangaSeries[];
-        setLibrary(data);
-        setLibraryError(null);
-      } catch (error) {
-        if ((error as Error).name === 'AbortError') return;
-        setLibraryError('本棚データの読み込みに失敗しました');
-      }
-    };
-
-    loadLibrary();
-    return () => controller.abort();
-  }, []);
-
-  const handleSearch = async (page = 1) => {
-    if (!hasSearchCondition) {
-      setSearchResults([]);
-      setSearchTotal(0);
-      setSearchPage(1);
-      setSearchError(null);
-      return;
-    }
-
-    setSearchLoading(true);
-    setSearchError(null);
-
-    const params = new URLSearchParams();
-    if (searchForm.q.trim()) params.set('q', searchForm.q.trim());
-    if (searchForm.title.trim()) params.set('title', searchForm.title.trim());
-    if (searchForm.author.trim()) params.set('author', searchForm.author.trim());
-    if (searchForm.publisher.trim()) params.set('publisher', searchForm.publisher.trim());
-    if (searchForm.from.trim()) params.set('from', searchForm.from.trim());
-    if (searchForm.until.trim()) params.set('until', searchForm.until.trim());
-    params.set('page', String(page));
-    params.set('limit', String(searchLimit));
-
-    try {
-      const response = await fetch(`/api/search?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-      const data = (await response.json()) as SearchResponse;
-      setSearchResults(data.items);
-      setSearchTotal(data.total);
-      setSearchPage(data.page);
-    } catch {
-      setSearchError('検索に失敗しました');
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleSearchSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    handleSearch(1);
-  };
-
-  const clearSearch = () => {
-    setSearchForm(DEFAULT_SEARCH_FORM);
-    setSearchResults([]);
-    setSearchTotal(0);
-    setSearchPage(1);
-    setSearchError(null);
-  };
 
   const selectSeriesFromSearch = (item: MangaSeries) => {
     const saved = libraryIndex.get(item.id);
     setSelectedSeries(saved ?? item);
   };
 
-  const updateSeries = async (updated: MangaSeries) => {
-    try {
-      const response = await fetch('/api/library', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-      if (!response.ok) {
-        throw new Error('Failed to save');
+  const handleUpdateSeries = (updated: MangaSeries) => {
+    void updateSeries(updated).then((saved) => {
+      if (saved) {
+        setSelectedSeries(saved);
       }
-      const saved = (await response.json()) as MangaSeries;
-      setLibrary((prev) => {
-        const exists = prev.some((item) => item.id === saved.id);
-        if (!exists) return [...prev, saved];
-        return prev.map((item) => (item.id === saved.id ? saved : item));
-      });
-      setSelectedSeries(saved);
-      setLibraryError(null);
-    } catch {
-      setLibraryError('本棚への保存に失敗しました');
-    }
+    });
   };
 
   const filteredLibrary = useMemo(() => {
@@ -475,7 +339,7 @@ export default function App() {
               <SeriesDetail
                 series={selectedSeries}
                 onBack={() => setSelectedSeries(null)}
-                onUpdate={updateSeries}
+                onUpdate={handleUpdateSeries}
                 isDark={isDark}
                 isInLibrary={libraryIndex.has(selectedSeries.id)}
               />
