@@ -38,5 +38,14 @@
 - `docs/tech-selection.md` は将来の方針。実装と不一致がある場合は現行コードを優先する
 - バックエンドは FastAPI をベースにし、`uv` で依存関係を管理する
 
+## コード設計の思想
+- DDD / クリーンアーキテクチャ / オニオンアーキテクチャ / CQRS を意識し、層を分離する
+- 依存方向は内向き（`presentation` → `application` → `domain`）で保つ
+- 読み取りは `application/queries`、書き込みは `application/commands` に分離する
+- API DTO とドメイン型の変換は `infrastructure/mappers` に集約する
+- リポジトリの抽象は `domain/repositories` に置き、実装は `infrastructure/repositories` に置く
+- UI は薄く保ち、ユースケース呼び出しと状態管理は `presentation/hooks` に集約する
+- `infrastructure/di` でユースケースを組み立て、`presentation/providers` で注入する
+
 ## ドキュメント更新
 - ファイルやディレクトリを追加・変更した場合は `README.md` の「ディレクトリ構造」「構成説明」「技術スタック」に追記・更新する

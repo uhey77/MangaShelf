@@ -66,12 +66,44 @@
 │   ├── tsconfig.node.json
 │   ├── vite.config.ts
 │   └── src/
-│       ├── App.tsx
+│       ├── domain/
+│       │   ├── entities/
+│       │   │   └── MangaSeries.ts
+│       │   ├── repositories/
+│       │   │   ├── LibraryRepository.ts
+│       │   │   └── SearchRepository.ts
+│       │   └── search.ts
+│       ├── application/
+│       │   ├── commands/
+│       │   │   ├── DeleteLibraryItem.ts
+│       │   │   └── UpsertLibraryItem.ts
+│       │   └── queries/
+│       │       ├── GetLibrary.ts
+│       │       └── SearchBooks.ts
+│       ├── infrastructure/
+│       │   ├── di/
+│       │   │   └── createAppContainer.ts
+│       │   ├── http/
+│       │   │   └── fetchJson.ts
+│       │   ├── mappers/
+│       │   │   └── libraryMapper.ts
+│       │   └── repositories/
+│       │       ├── LibraryApiRepository.ts
+│       │       └── SearchApiRepository.ts
+│       ├── presentation/
+│       │   ├── hooks/
+│       │   │   ├── useLibrary.ts
+│       │   │   └── useSearch.ts
+│       │   ├── providers/
+│       │   │   └── AppProvider.tsx
+│       │   ├── utils/
+│       │   │   └── formatters.ts
+│       │   └── App.tsx
+│       ├── components/
+│       │   └── figma/
+│       │       └── ImageWithFallback.tsx
 │       ├── main.tsx
-│       ├── index.css
-│       └── components/
-│           └── figma/
-│               └── ImageWithFallback.tsx
+│       └── index.css
 ├── skills/
 │   └── .gitkeep
 ├── .gitignore
@@ -151,13 +183,29 @@
 | `frontend/tsconfig.json` | フロントエンドの TypeScript 設定。 |
 | `frontend/tsconfig.node.json` | Vite 設定向けの TypeScript 設定。 |
 | `frontend/vite.config.ts` | Vite の設定。 |
-| `frontend/src/` | React アプリのソースコード。 |
-| `frontend/src/App.tsx` | 画面全体のメインコンポーネント。 |
-| `frontend/src/main.tsx` | React のエントリポイント。 |
-| `frontend/src/index.css` | Tailwind の読み込みを含むグローバル CSS。 |
+| `frontend/src/` | React アプリのソースコード（DDD/CQRS 構成）。 |
+| `frontend/src/domain/` | ドメイン層（エンティティ・リポジトリIF）。 |
+| `frontend/src/domain/entities/` | ドメインエンティティ定義。 |
+| `frontend/src/domain/repositories/` | リポジトリ抽象。 |
+| `frontend/src/domain/search.ts` | 検索クエリ・検索結果の型。 |
+| `frontend/src/application/` | アプリケーション層（ユースケース）。 |
+| `frontend/src/application/commands/` | コマンド（書き込みユースケース）。 |
+| `frontend/src/application/queries/` | クエリ（読み取りユースケース）。 |
+| `frontend/src/infrastructure/` | インフラ層（API 連携・DTO 変換）。 |
+| `frontend/src/infrastructure/di/` | フロントエンドの DI 構成。 |
+| `frontend/src/infrastructure/http/` | fetch 共通処理。 |
+| `frontend/src/infrastructure/mappers/` | API DTO とドメイン型の変換。 |
+| `frontend/src/infrastructure/repositories/` | API 実装リポジトリ。 |
+| `frontend/src/presentation/` | プレゼンテーション層（UI）。 |
+| `frontend/src/presentation/App.tsx` | 画面全体のメインコンポーネント。 |
+| `frontend/src/presentation/hooks/` | UI 向け hooks。 |
+| `frontend/src/presentation/providers/` | DI コンテナの Provider。 |
+| `frontend/src/presentation/utils/` | 表示用ユーティリティ。 |
 | `frontend/src/components/` | UI コンポーネント群。 |
 | `frontend/src/components/figma/` | Figma 由来の部品を置くディレクトリ。 |
 | `frontend/src/components/figma/ImageWithFallback.tsx` | 画像読み込み失敗時のフォールバック付き画像コンポーネント。 |
+| `frontend/src/main.tsx` | React のエントリポイント。 |
+| `frontend/src/index.css` | Tailwind の読み込みを含むグローバル CSS。 |
 | `skills/` | Codex 用のスキルディレクトリ。 |
 | `skills/.gitkeep` | 空ディレクトリ維持用ファイル。 |
 | `.gitignore` | Git の追跡対象外を定義。 |
@@ -189,3 +237,15 @@
 | 設計 | DDD / Clean / Onion / CQRS | 層分離 | バックエンド構成指針 |
 | 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
+
+
+## コード設計の思想
+
+MangaShelf は保守性と学びやすさを重視し、バックエンドと同様にフロントエンドでも DDD / クリーンアーキテクチャ / オニオンアーキテクチャ / CQRS を意識した層構造を採用しています。
+
+- **依存方向は内向き**: `presentation` → `application` → `domain` の依存だけを許容し、`domain` は外部実装に依存しません。
+- **CQRS の分離**: 読み取りは `application/queries`、書き込みは `application/commands` に分割し、UI 側の責務を明確化しています。
+- **DTO 変換の集中**: API 由来の DTO とドメイン型の変換は `infrastructure/mappers` に集約します。
+- **インフラの差し替え容易性**: `domain/repositories` の抽象に対して `infrastructure/repositories` が実装を持ちます。
+- **UI は薄く、hooks に集約**: 状態管理やユースケース呼び出しは `presentation/hooks` にまとめ、UI は描画に専念します。
+- **DI による組み立て**: `infrastructure/di` でリポジトリとユースケースを組み立て、`presentation/providers` から注入します。
