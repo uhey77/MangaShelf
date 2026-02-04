@@ -7,6 +7,12 @@ tasks:
       - task -l
     silent: true
 
+  check:
+    desc: バックエンド・フロントエンドのチェックを実行
+    cmds:
+      - task backend:check
+      - task frontend:check
+
   frontend:install:
     desc: フロントエンド依存関係をインストール
     dir: frontend
