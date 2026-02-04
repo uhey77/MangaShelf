@@ -16,3 +16,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/domain", "src/application", "src/infrastructure", "src/presentation"]
 include = ["src/main.py"]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.15.0",
+  "ty>=0.0.14"
+]

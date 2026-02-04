@@ -81,6 +81,7 @@
 ```
 
 `node_modules/`, `.venv/`, `.mypy_cache/`, `.git/` は自動生成のため省略しています。
+`backend/pyproject.toml` には Ruff/ty の開発ツール設定を追加しています。
 
 
 ## 構成説明
@@ -95,7 +96,7 @@
 | `backend/` | Python のバックエンド API。 |
 | `backend/data/` | 本棚データの保存先。 |
 | `backend/data/library.json` | 本棚データのサンプルと保存ファイル。 |
-| `backend/pyproject.toml` | バックエンドの依存関係定義。 |
+| `backend/pyproject.toml` | バックエンドの依存関係定義。Ruff/ty の開発ツール設定を含む。 |
 | `backend/uv.lock` | uv のロックファイル。 |
 | `backend/src/` | バックエンドのソースコード。 |
 | `backend/src/main.py` | FastAPI のエントリポイント。 |
@@ -183,6 +184,8 @@
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | 国立国会図書館サーチ API を利用 |
 | バックエンド | datetime (標準ライブラリ) | 日付型 | 検索期間に `date` を利用 |
+| バックエンド開発ツール | Ruff | リント/フォーマット | Python 向け |
+| バックエンド開発ツール | ty | 型チェック | Python 向け |
 | 設計 | DDD / Clean / Onion / CQRS | 層分離 | バックエンド構成指針 |
 | 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
