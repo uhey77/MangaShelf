@@ -4,7 +4,10 @@ from typing import List
 
 from fastapi import APIRouter, Depends
 
-from application.commands.delete_library_item import DeleteLibraryItemCommand, DeleteLibraryItemHandler
+from application.commands.delete_library_item import (
+    DeleteLibraryItemCommand,
+    DeleteLibraryItemHandler,
+)
 from application.commands.upsert_library_item import (
     UpsertLibraryItemCommand,
     UpsertLibraryItemHandler,
@@ -21,7 +24,9 @@ router = APIRouter(prefix="/api", tags=["library"])
 
 
 @router.get("/library", response_model=List[LibraryItemSchema])
-def get_library(handler: GetLibraryHandler = Depends(get_get_library_handler)) -> List[LibraryItemSchema]:
+def get_library(
+    handler: GetLibraryHandler = Depends(get_get_library_handler),
+) -> List[LibraryItemSchema]:
     items = handler.handle(GetLibraryQuery())
     return [LibraryItemSchema.from_domain(item) for item in items]
 

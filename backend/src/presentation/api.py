@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,8 +15,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(title="MangaShelf API")
+    # ty currently flags CORSMiddleware's type; cast keeps runtime behavior intact.
     app.add_middleware(
-        CORSMiddleware,
+        cast(Any, CORSMiddleware),
         allow_origins=list(settings.cors_origins),
         allow_methods=["*"],
         allow_headers=["*"],

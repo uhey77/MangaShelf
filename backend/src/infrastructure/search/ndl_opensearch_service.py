@@ -22,7 +22,9 @@ XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 
 
 class NDLOpenSearchService(BookSearchService):
-    def __init__(self, endpoint: str, thumbnail_base: str, timeout_seconds: int = 10) -> None:
+    def __init__(
+        self, endpoint: str, thumbnail_base: str, timeout_seconds: int = 10
+    ) -> None:
         self._endpoint = endpoint
         self._thumbnail_base = thumbnail_base
         self._timeout_seconds = timeout_seconds
@@ -52,7 +54,9 @@ class NDLOpenSearchService(BookSearchService):
             params["until"] = query.until.isoformat()
 
         try:
-            response = requests.get(self._endpoint, params=params, timeout=self._timeout_seconds)
+            response = requests.get(
+                self._endpoint, params=params, timeout=self._timeout_seconds
+            )
         except requests.RequestException as exc:
             raise SearchServiceError("検索APIに接続できませんでした。") from exc
 
@@ -63,7 +67,9 @@ class NDLOpenSearchService(BookSearchService):
         return SearchResult(items=items, total=total, page=page, limit=limit)
 
 
-def parse_opensearch(xml_bytes: bytes, thumbnail_base: str) -> tuple[List[LibraryItem], int]:
+def parse_opensearch(
+    xml_bytes: bytes, thumbnail_base: str
+) -> tuple[List[LibraryItem], int]:
     root = ET.fromstring(xml_bytes)
     channel = root.find("channel")
     if channel is None:
