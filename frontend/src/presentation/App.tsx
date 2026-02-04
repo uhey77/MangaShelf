@@ -202,7 +202,7 @@ export default function App() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between text-xs text-zinc-500">
-                  <span>データ提供: 国立国会図書館サーチ</span>
+                  <span>データ提供: 国立国会図書館サーチ / 楽天ブックス / Google Books</span>
                   <span>{hasSearchCondition ? `${searchTotal}件` : '検索条件を入力'}</span>
                 </div>
               </form>
@@ -512,6 +512,18 @@ function SeriesDetail({
   isInLibrary: boolean;
 }) {
   const [noteText, setNoteText] = useState(series.notes);
+  const sourceLabel = (() => {
+    switch (series.source) {
+      case 'ndl':
+        return 'NDLで見る';
+      case 'rakuten':
+        return '楽天で見る';
+      case 'google':
+        return 'Google Booksで見る';
+      default:
+        return '外部で見る';
+    }
+  })();
 
   useEffect(() => {
     setNoteText(series.notes);
@@ -585,7 +597,7 @@ function SeriesDetail({
                   rel="noreferrer"
                   className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors"
                 >
-                  NDLで見る <ExternalLink size={12} />
+                  {sourceLabel} <ExternalLink size={12} />
                 </a>
               )}
               {!isInLibrary && (

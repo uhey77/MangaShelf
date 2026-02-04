@@ -38,7 +38,10 @@
 │   │   │   │   └── json_library_repository.py
 │   │   │   └── search/
 │   │   │       ├── __init__.py
-│   │   │       └── ndl_opensearch_service.py
+│   │   │       ├── composite_search_service.py
+│   │   │       ├── google_books_service.py
+│   │   │       ├── ndl_opensearch_service.py
+│   │   │       └── rakuten_books_service.py
 │   │   └── presentation/
 │   │       ├── __init__.py
 │   │       ├── api.py
@@ -157,7 +160,10 @@
 | `backend/src/infrastructure/persistence/json_library_repository.py` | JSON ファイル永続化。 |
 | `backend/src/infrastructure/search/` | 外部検索アダプタ。 |
 | `backend/src/infrastructure/search/__init__.py` | 検索アダプタのパッケージ定義。 |
+| `backend/src/infrastructure/search/composite_search_service.py` | 複数の検索ソースを統合するサービス。 |
+| `backend/src/infrastructure/search/google_books_service.py` | Google Books API 連携。 |
 | `backend/src/infrastructure/search/ndl_opensearch_service.py` | NDL OpenSearch 連携。 |
+| `backend/src/infrastructure/search/rakuten_books_service.py` | 楽天ブックス API 連携。 |
 | `backend/src/presentation/` | プレゼンテーション層（API）。 |
 | `backend/src/presentation/__init__.py` | API 層のパッケージ定義。 |
 | `backend/src/presentation/api.py` | FastAPI アプリ生成。 |
@@ -230,7 +236,7 @@
 | フロントエンド | motion | アニメーション | Framer Motion ベース |
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
-| バックエンド | requests | 外部検索 | 国立国会図書館サーチ API を利用 |
+| バックエンド | requests | 外部検索 | NDL OpenSearch / 楽天ブックス API / Google Books API を利用 |
 | バックエンド | datetime (標準ライブラリ) | 日付型 | 検索期間に `date` を利用 |
 | バックエンド開発ツール | Ruff | リント/フォーマット | Python 向け |
 | バックエンド開発ツール | ty | 型チェック | Python 向け |
