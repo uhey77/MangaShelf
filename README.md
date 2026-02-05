@@ -237,6 +237,7 @@
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | NDL OpenSearch / 楽天ブックス API / Google Books API を利用 |
+| バックエンド | python-dotenv | 環境変数読込 | `.env` をロード |
 | バックエンド | datetime (標準ライブラリ) | 日付型 | 検索期間に `date` を利用 |
 | バックエンド開発ツール | Ruff | リント/フォーマット | Python 向け |
 | バックエンド開発ツール | ty | 型チェック | Python 向け |
