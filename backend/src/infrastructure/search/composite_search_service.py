@@ -50,7 +50,7 @@ class CompositeBookSearchService(BookSearchService):
         deduped = deduplicate(results)
         start = (page - 1) * limit
         sliced = deduped[start : start + limit]
-        return SearchResult(items=sliced, total=total, page=page, limit=limit)
+        return SearchResult(items=sliced, total=len(deduped), page=page, limit=limit)
 
 
 def deduplicate(items: Iterable[LibraryItem]) -> List[LibraryItem]:
