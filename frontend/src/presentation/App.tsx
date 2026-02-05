@@ -202,7 +202,6 @@ export default function App() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between text-xs text-zinc-500">
-                  <span>データ提供: 国立国会図書館サーチ</span>
                   <span>{hasSearchCondition ? `${searchTotal}件` : '検索条件を入力'}</span>
                 </div>
               </form>
