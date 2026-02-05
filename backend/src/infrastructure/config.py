@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Optional, Tuple
 
+from dotenv import load_dotenv
+
 
 @dataclass(frozen=True)
 class AppSettings:
@@ -23,6 +25,7 @@ class AppSettings:
 @lru_cache
 def get_settings() -> AppSettings:
     root = Path(__file__).resolve().parents[2]
+    load_dotenv(root / ".env")
     return AppSettings(
         data_file=root / "data" / "library.json",
         ndl_endpoint="https://ndlsearch.ndl.go.jp/api/opensearch",
