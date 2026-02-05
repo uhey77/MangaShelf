@@ -2,6 +2,7 @@
 
 ## 応答方針
 - 回答は日本語で行うこと。
+- コードを書く際は設計思想を大事にすること。
 
 ## プロジェクト概要
 - MangaShelf のフロントエンドは `frontend/` 配下（Vite + React + TypeScript + Tailwind）
