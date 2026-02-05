@@ -22,6 +22,7 @@
 │   │   │   └── queries/
 │   │   │       ├── __init__.py
 │   │   │       ├── get_library.py
+│   │   │       ├── rank_search_results.py
 │   │   │       └── search_books.py
 │   │   ├── domain/
 │   │   │   ├── __init__.py
@@ -144,6 +145,7 @@
 | `backend/src/application/queries/` | クエリ（読み取りユースケース）。 |
 | `backend/src/application/queries/__init__.py` | クエリ層のパッケージ定義。 |
 | `backend/src/application/queries/get_library.py` | 所持データ取得クエリ。 |
+| `backend/src/application/queries/rank_search_results.py` | 検索結果のランキングを行うユースケース。 |
 | `backend/src/application/queries/search_books.py` | 検索ユースケース。 |
 | `backend/src/domain/` | ドメイン層（エンティティ・リポジトリIF）。 |
 | `backend/src/domain/__init__.py` | ドメイン層のパッケージ定義。 |
