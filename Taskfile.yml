@@ -80,6 +80,7 @@ tasks:
     desc: バックエンド開発サーバーを起動
     dir: backend
     cmds:
+      - task env:decrypt
       - uv run --no-project uvicorn main:app --reload --port 8000 --app-dir src
     interactive: true
 
@@ -114,3 +115,17 @@ tasks:
       - uv run ruff check src
       - uv run ty check src
       - uv run ruff format --check src
+
+  env:decrypt:
+    desc: .env.enc を復号して backend/.env を生成
+    cmds:
+      - bash -lc 'command -v sops >/dev/null 2>&1 || { echo "sops が見つかりません"; exit 1; }'
+      - bash -lc 'test -f backend/.env.enc || { echo "backend/.env.enc がありません"; exit 1; }'
+      - bash -lc 'sops -d backend/.env.enc > backend/.env'
+
+  env:encrypt:
+    desc: backend/.env を暗号化して .env.enc を生成
+    cmds:
+      - bash -lc 'command -v sops >/dev/null 2>&1 || { echo "sops が見つかりません"; exit 1; }'
+      - bash -lc 'test -f backend/.env || { echo "backend/.env がありません"; exit 1; }'
+      - bash -lc 'sops -e backend/.env > backend/.env.enc'

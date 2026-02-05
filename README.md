@@ -113,6 +113,7 @@
 ├── .gitignore
 ├── AGENTS.md
 ├── Taskfile.yml
+├── .sops.yaml
 └── README.md
 ```
 
@@ -219,6 +220,7 @@
 | `.gitignore` | Git の追跡対象外を定義。 |
 | `AGENTS.md` | Codex エージェント向けの作業指示。 |
 | `Taskfile.yml` | タスクランナー（Task）用のコマンド定義。 |
+| `.sops.yaml` | sops 用の暗号化設定。 |
 | `README.md` | リポジトリの概要と構成説明。 |
 
 
@@ -246,6 +248,7 @@
 | 設計 | DDD / Clean / Onion / CQRS | 層分離 | バックエンド構成指針 |
 | 開発ツール | uv | Python 環境 | 仮想環境と依存関係管理 |
 | 開発ツール | Task (go-task) | タスクランナー | 開発コマンドの集約 |
+| 開発ツール | sops + age | 機密管理 | `.env.enc` の暗号化 |
 
 
 ## コード設計の思想
@@ -258,3 +261,22 @@ MangaShelf は保守性と学びやすさを重視し、バックエンドと同
 - **インフラの差し替え容易性**: `domain/repositories` の抽象に対して `infrastructure/repositories` が実装を持ちます。
 - **UI は薄く、hooks に集約**: 状態管理やユースケース呼び出しは `presentation/hooks` にまとめ、UI は描画に専念します。
 - **DI による組み立て**: `infrastructure/di` でリポジトリとユースケースを組み立て、`presentation/providers` から注入します。
+
+## .env.enc の運用
+
+- `backend/.env.enc` を暗号化ファイルとして管理し、起動時に自動復号します。
+- `backend/.env` は復号後に生成され、Git 管理対象外です。
+
+### 初期セットアップ
+
+1. age の鍵を用意し、`.sops.yaml` の `age` に公開鍵を設定する。
+2. `backend/.env` を用意する。
+3. 暗号化:
+
+```bash
+task env:encrypt
+```
+
+### 開発時の起動
+
+`task backend:dev` 実行時に `.env.enc` が自動復号されます。
