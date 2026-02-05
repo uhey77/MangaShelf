@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from application.queries.rank_search_results import rank_search_result
 from domain.search import SearchQuery, SearchResult
 from domain.services import BookSearchService
 
@@ -21,4 +22,5 @@ class SearchBooksHandler:
         )
         if not has_condition:
             return SearchResult(items=[], total=0, page=query.page, limit=query.limit)
-        return self._service.search(query)
+        result = self._service.search(query)
+        return rank_search_result(result, query)
