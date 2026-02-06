@@ -1,4 +1,4 @@
 creation_rules:
-  - path_regex: backend/\.env\.enc$
+  - path_regex: backend/\.env(\.enc)?$
     age:
       - age124tn3hajfg5s5cwtq4xec23dmzhf9ns2hskju4c00tucdlcdhsps5v7n23
