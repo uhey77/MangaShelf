@@ -119,13 +119,58 @@ tasks:
   env:decrypt:
     desc: .env.enc を復号して backend/.env を生成
     cmds:
-      - bash -lc 'command -v sops >/dev/null 2>&1 || { echo "sops が見つかりません"; exit 1; }'
-      - bash -lc 'test -f backend/.env.enc || { echo "backend/.env.enc がありません"; exit 1; }'
-      - bash -lc 'sops -d backend/.env.enc > backend/.env'
+      - |
+        bash -lc '
+          key_file="${SOPS_AGE_KEY_FILE:-}"
+          if [ -z "$key_file" ]; then
+            if [ -f "$HOME/.config/sops/age/keys.txt" ]; then
+              key_file="$HOME/.config/sops/age/keys.txt"
+            elif [ -f "$HOME/.config/age/key.txt" ]; then
+              key_file="$HOME/.config/age/key.txt"
+            fi
+          fi
+
+          if [ -f backend/.env.enc ]; then
+            command -v sops >/dev/null 2>&1 || {
+              echo "sops が見つかりません（backend/.env.enc の復号に必要です）"
+              echo "macOS の場合: brew install sops"
+              if [ -s backend/.env ]; then
+                echo "既存の backend/.env を利用します"
+                exit 0
+              fi
+              exit 1
+            }
+
+            tmp_file="$(mktemp backend/.env.tmp.XXXXXX)"
+            if [ -n "$key_file" ]; then
+              export SOPS_AGE_KEY_FILE="$key_file"
+            fi
+
+            if sops -d --input-type dotenv --output-type dotenv backend/.env.enc > "$tmp_file"; then
+              mv "$tmp_file" backend/.env
+              echo "backend/.env.enc を復号して backend/.env を生成しました"
+            else
+              rm -f "$tmp_file"
+              if [ -s backend/.env ]; then
+                echo "backend/.env.enc の復号に失敗したため、既存の backend/.env を利用します"
+              else
+                echo "backend/.env.enc の復号に失敗し、利用可能な backend/.env もありません"
+                echo "SOPS_AGE_KEY_FILE を設定するか、~/.config/sops/age/keys.txt または ~/.config/age/key.txt に age 秘密鍵を配置してください"
+                exit 1
+              fi
+            fi
+          elif [ -s backend/.env ]; then
+            echo "backend/.env.enc がないため、既存の backend/.env を利用します"
+          else
+            echo "backend/.env.enc と backend/.env のどちらもありません"
+            echo "backend/.env.example をコピーして backend/.env を作成するか、task env:encrypt で backend/.env.enc を作成してください"
+            exit 1
+          fi
+        '
 
   env:encrypt:
     desc: backend/.env を暗号化して .env.enc を生成
     cmds:
       - bash -lc 'command -v sops >/dev/null 2>&1 || { echo "sops が見つかりません"; exit 1; }'
       - bash -lc 'test -f backend/.env || { echo "backend/.env がありません"; exit 1; }'
-      - bash -lc 'sops -e backend/.env > backend/.env.enc'
+      - bash -lc 'sops -e --input-type dotenv --output-type dotenv --output backend/.env.enc backend/.env'
