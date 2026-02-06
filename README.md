@@ -266,12 +266,16 @@ MangaShelf は保守性と学びやすさを重視し、バックエンドと同
 
 - `backend/.env.enc` を暗号化ファイルとして管理し、起動時に自動復号します。
 - `backend/.env` は復号後に生成され、Git 管理対象外です。
+- `backend/.env.enc` がない場合は、既存の `backend/.env` をそのまま利用して起動できます。
+- `.sops.yaml` の `path_regex` は `backend/.env` と `backend/.env.enc` の両方に一致する設定にします。
 
 ### 初期セットアップ
 
-1. age の鍵を用意し、`.sops.yaml` の `age` に公開鍵を設定する。
-2. `backend/.env` を用意する。
-3. 暗号化:
+1. （macOS）`brew install sops age` で暗号化ツールを入れる。
+2. age の鍵を用意し、`.sops.yaml` の `age` に公開鍵を設定する。
+3. 復号用の秘密鍵を `SOPS_AGE_KEY_FILE` に設定するか、`~/.config/sops/age/keys.txt` / `~/.config/age/key.txt` に配置する。
+4. `backend/.env` を用意する。
+5. 暗号化:
 
 ```bash
 task env:encrypt
@@ -279,4 +283,6 @@ task env:encrypt
 
 ### 開発時の起動
 
-`task backend:dev` 実行時に `.env.enc` が自動復号されます。
+- `backend/.env.enc` がある場合: `task backend:dev` 実行時に自動復号されます（`sops` が必要）。
+- `backend/.env.enc` がない場合: `backend/.env` をそのまま利用して起動します。
+- `backend/.env.enc` の復号に失敗した場合でも、既存の `backend/.env` があればそれを利用して起動します。
