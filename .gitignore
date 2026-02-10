@@ -5,7 +5,7 @@ node_modules
 __pycache__/
 backend/.venv/
 backend/.python-version
-
+library.json
 # env
 .env
 .env.enc
