@@ -72,16 +72,20 @@
 │   └── src/
 │       ├── domain/
 │       │   ├── entities/
+│       │   │   ├── AppSettings.ts
 │       │   │   └── MangaSeries.ts
 │       │   ├── repositories/
+│       │   │   ├── AppSettingsRepository.ts
 │       │   │   ├── LibraryRepository.ts
 │       │   │   └── SearchRepository.ts
 │       │   └── search.ts
 │       ├── application/
 │       │   ├── commands/
 │       │   │   ├── DeleteLibraryItem.ts
+│       │   │   ├── SaveAppSettings.ts
 │       │   │   └── UpsertLibraryItem.ts
 │       │   └── queries/
+│       │       ├── GetAppSettings.ts
 │       │       ├── GetLibrary.ts
 │       │       └── SearchBooks.ts
 │       ├── infrastructure/
@@ -93,9 +97,11 @@
 │       │   │   └── libraryMapper.ts
 │       │   └── repositories/
 │       │       ├── LibraryApiRepository.ts
+│       │       ├── LocalStorageAppSettingsRepository.ts
 │       │       └── SearchApiRepository.ts
 │       ├── presentation/
 │       │   ├── hooks/
+│       │   │   ├── useAppSettings.ts
 │       │   │   ├── useLibrary.ts
 │       │   │   └── useSearch.ts
 │       │   ├── providers/
@@ -195,19 +201,25 @@
 | `frontend/src/` | React アプリのソースコード（DDD/CQRS 構成）。 |
 | `frontend/src/domain/` | ドメイン層（エンティティ・リポジトリIF）。 |
 | `frontend/src/domain/entities/` | ドメインエンティティ定義。 |
+| `frontend/src/domain/entities/AppSettings.ts` | アプリ設定ドメイン型（テーマ・通知・表示設定）。 |
 | `frontend/src/domain/repositories/` | リポジトリ抽象。 |
+| `frontend/src/domain/repositories/AppSettingsRepository.ts` | アプリ設定リポジトリ抽象。 |
 | `frontend/src/domain/search.ts` | 検索クエリ・検索結果の型。 |
 | `frontend/src/application/` | アプリケーション層（ユースケース）。 |
 | `frontend/src/application/commands/` | コマンド（書き込みユースケース）。 |
+| `frontend/src/application/commands/SaveAppSettings.ts` | アプリ設定保存コマンド。 |
 | `frontend/src/application/queries/` | クエリ（読み取りユースケース）。 |
+| `frontend/src/application/queries/GetAppSettings.ts` | アプリ設定取得クエリ。 |
 | `frontend/src/infrastructure/` | インフラ層（API 連携・DTO 変換）。 |
 | `frontend/src/infrastructure/di/` | フロントエンドの DI 構成。 |
 | `frontend/src/infrastructure/http/` | fetch 共通処理。 |
 | `frontend/src/infrastructure/mappers/` | API DTO とドメイン型の変換。 |
 | `frontend/src/infrastructure/repositories/` | API 実装リポジトリ。 |
+| `frontend/src/infrastructure/repositories/LocalStorageAppSettingsRepository.ts` | localStorage を使ったアプリ設定永続化実装。 |
 | `frontend/src/presentation/` | プレゼンテーション層（UI）。 |
 | `frontend/src/presentation/App.tsx` | 画面全体のメインコンポーネント。 |
 | `frontend/src/presentation/hooks/` | UI 向け hooks。 |
+| `frontend/src/presentation/hooks/useAppSettings.ts` | 設定読み書き・通知権限・起動時通知の UI ロジック。 |
 | `frontend/src/presentation/providers/` | DI コンテナの Provider。 |
 | `frontend/src/presentation/utils/` | 表示用ユーティリティ。 |
 | `frontend/src/components/` | UI コンポーネント群。 |
@@ -238,6 +250,8 @@
 | フロントエンド | Prettier | フォーマッター | コード整形 |
 | フロントエンド | lucide-react | アイコン | Lucide の React 実装 |
 | フロントエンド | motion | アニメーション | Framer Motion ベース |
+| フロントエンド | Web Storage API (localStorage) | 設定永続化 | テーマ・通知・表示設定を保存 |
+| フロントエンド | Web Notification API | 新刊通知 | 7日以内の次巻発売を起動時に通知 |
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | NDL OpenSearch / 楽天ブックス API / Google Books API を利用 |
