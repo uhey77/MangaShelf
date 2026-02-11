@@ -59,6 +59,7 @@
 │   └── tech-selection.md
 ├── frontend/
 │   ├── index.html
+│   ├── .env.example
 │   ├── .eslintrc.cjs
 │   ├── .prettierrc.cjs
 │   ├── .prettierignore
@@ -76,6 +77,7 @@
 │       │   │   └── MangaSeries.ts
 │       │   ├── repositories/
 │       │   │   ├── AppSettingsRepository.ts
+│       │   │   ├── GoogleDriveBackupRepository.ts
 │       │   │   ├── LibraryRepository.ts
 │       │   │   └── SearchRepository.ts
 │       │   └── search.ts
@@ -83,6 +85,7 @@
 │       │   ├── commands/
 │       │   │   ├── DeleteLibraryItem.ts
 │       │   │   ├── SaveAppSettings.ts
+│       │   │   ├── SyncLibraryToGoogleDrive.ts
 │       │   │   └── UpsertLibraryItem.ts
 │       │   └── queries/
 │       │       ├── GetAppSettings.ts
@@ -96,6 +99,7 @@
 │       │   ├── mappers/
 │       │   │   └── libraryMapper.ts
 │       │   └── repositories/
+│       │       ├── GoogleDriveBackupApiRepository.ts
 │       │       ├── LibraryApiRepository.ts
 │       │       ├── LocalStorageAppSettingsRepository.ts
 │       │       └── SearchApiRepository.ts
@@ -188,6 +192,7 @@
 | `docs/tech-selection.md` | 技術選定の理由・方針。 |
 | `frontend/` | フロントエンド（Vite + React + Tailwind）のルート。 |
 | `frontend/index.html` | Vite のエントリ HTML。 |
+| `frontend/.env.example` | フロントエンド環境変数のサンプル。 |
 | `frontend/.eslintrc.cjs` | ESLint 設定。 |
 | `frontend/.prettierrc.cjs` | Prettier 設定。 |
 | `frontend/.prettierignore` | Prettier の除外設定。 |
@@ -201,13 +206,15 @@
 | `frontend/src/` | React アプリのソースコード（DDD/CQRS 構成）。 |
 | `frontend/src/domain/` | ドメイン層（エンティティ・リポジトリIF）。 |
 | `frontend/src/domain/entities/` | ドメインエンティティ定義。 |
-| `frontend/src/domain/entities/AppSettings.ts` | アプリ設定ドメイン型（テーマ・通知・表示設定）。 |
+| `frontend/src/domain/entities/AppSettings.ts` | アプリ設定ドメイン型（テーマ・通知・表示設定・Drive連携状態）。 |
 | `frontend/src/domain/repositories/` | リポジトリ抽象。 |
 | `frontend/src/domain/repositories/AppSettingsRepository.ts` | アプリ設定リポジトリ抽象。 |
+| `frontend/src/domain/repositories/GoogleDriveBackupRepository.ts` | Google Drive バックアップ用リポジトリ抽象。 |
 | `frontend/src/domain/search.ts` | 検索クエリ・検索結果の型。 |
 | `frontend/src/application/` | アプリケーション層（ユースケース）。 |
 | `frontend/src/application/commands/` | コマンド（書き込みユースケース）。 |
 | `frontend/src/application/commands/SaveAppSettings.ts` | アプリ設定保存コマンド。 |
+| `frontend/src/application/commands/SyncLibraryToGoogleDrive.ts` | Google Drive 同期コマンド。 |
 | `frontend/src/application/queries/` | クエリ（読み取りユースケース）。 |
 | `frontend/src/application/queries/GetAppSettings.ts` | アプリ設定取得クエリ。 |
 | `frontend/src/infrastructure/` | インフラ層（API 連携・DTO 変換）。 |
@@ -215,11 +222,12 @@
 | `frontend/src/infrastructure/http/` | fetch 共通処理。 |
 | `frontend/src/infrastructure/mappers/` | API DTO とドメイン型の変換。 |
 | `frontend/src/infrastructure/repositories/` | API 実装リポジトリ。 |
+| `frontend/src/infrastructure/repositories/GoogleDriveBackupApiRepository.ts` | Google Drive API / GIS 連携によるバックアップ実装。 |
 | `frontend/src/infrastructure/repositories/LocalStorageAppSettingsRepository.ts` | localStorage を使ったアプリ設定永続化実装。 |
 | `frontend/src/presentation/` | プレゼンテーション層（UI）。 |
 | `frontend/src/presentation/App.tsx` | 画面全体のメインコンポーネント。 |
 | `frontend/src/presentation/hooks/` | UI 向け hooks。 |
-| `frontend/src/presentation/hooks/useAppSettings.ts` | 設定読み書き・通知権限・起動時通知の UI ロジック。 |
+| `frontend/src/presentation/hooks/useAppSettings.ts` | 設定読み書き・通知権限・起動時通知・Drive同期の UI ロジック。 |
 | `frontend/src/presentation/providers/` | DI コンテナの Provider。 |
 | `frontend/src/presentation/utils/` | 表示用ユーティリティ。 |
 | `frontend/src/components/` | UI コンポーネント群。 |
@@ -252,6 +260,8 @@
 | フロントエンド | motion | アニメーション | Framer Motion ベース |
 | フロントエンド | Web Storage API (localStorage) | 設定永続化 | テーマ・通知・表示設定を保存 |
 | フロントエンド | Web Notification API | 新刊通知 | 7日以内の次巻発売を起動時に通知 |
+| フロントエンド | Google Identity Services | Google OAuth | Drive 同期用アクセストークン取得 |
+| フロントエンド | Google Drive API | クラウドバックアップ | 本棚データ JSON をアップロード |
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | NDL OpenSearch / 楽天ブックス API / Google Books API を利用 |
@@ -275,6 +285,14 @@ MangaShelf は保守性と学びやすさを重視し、バックエンドと同
 - **インフラの差し替え容易性**: `domain/repositories` の抽象に対して `infrastructure/repositories` が実装を持ちます。
 - **UI は薄く、hooks に集約**: 状態管理やユースケース呼び出しは `presentation/hooks` にまとめ、UI は描画に専念します。
 - **DI による組み立て**: `infrastructure/di` でリポジトリとユースケースを組み立て、`presentation/providers` から注入します。
+
+## Google Drive 連携の設定
+
+1. Google Cloud Console で OAuth 同意画面を作成し、Web アプリの OAuth クライアント ID を発行する。
+2. OAuth クライアントの `Authorized JavaScript origins` に `http://localhost:5173` を追加する。
+3. `frontend/.env.example` を `frontend/.env` にコピーし、`VITE_GOOGLE_CLIENT_ID` を設定する。
+4. `task frontend:dev` を再起動し、設定タブの「Google Drive バックアップ」から同期する。
+5. 初回同期時に Google Drive 直下へ `MangaShelf` フォルダが自動作成され、その中にバックアップ JSON が保存される。
 
 ## .env.enc の運用
 
