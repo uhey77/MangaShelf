@@ -10,6 +10,7 @@ import requests
 from domain.errors import SearchServiceError
 from domain.models import LibraryItem
 from domain.search import SearchQuery, SearchResult
+from domain.series_identity import extract_volume_number
 from domain.services import BookSearchService
 
 NS = {
@@ -98,6 +99,7 @@ def parse_opensearch(
         isbn = extract_isbn(item)
         seed = link or isbn or f"{title}|{author}|{publisher}|{issued}"
         item_id = build_ndl_id(seed)
+        latest_volume = extract_volume_number(title) or 1
 
         items.append(
             LibraryItem(
@@ -106,7 +108,7 @@ def parse_opensearch(
                 author=author or "",
                 publisher=publisher or None,
                 published_date=issued or None,
-                latest_volume=1,
+                latest_volume=latest_volume,
                 owned_volumes=[],
                 next_release_date=None,
                 is_favorite=False,

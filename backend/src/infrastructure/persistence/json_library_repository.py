@@ -26,7 +26,11 @@ class JsonLibraryRepository(LibraryRepository):
         if not isinstance(data, list):
             return []
 
-        items = [self._from_dict(item) for item in data if isinstance(item, dict)]
+        items = [
+            normalize_library_item(self._from_dict(item))
+            for item in data
+            if isinstance(item, dict)
+        ]
         merged_items = merge_library_items(items)
 
         source_dicts = [self._to_dict(item) for item in items]
@@ -37,6 +41,7 @@ class JsonLibraryRepository(LibraryRepository):
         return merged_items
 
     def upsert(self, item: LibraryItem) -> LibraryItem:
+        item = normalize_library_item(item)
         items = self.list()
 
         for index, existing in enumerate(items):
@@ -128,28 +133,61 @@ def merge_library_items(items: List[LibraryItem]) -> List[LibraryItem]:
     series_index: dict[str, int] = {}
 
     for item in items:
-        existing_index = id_index.get(item.id)
-        item_series_key = build_series_key(item.title, item.author)
+        normalized_item = normalize_library_item(item)
+        existing_index = id_index.get(normalized_item.id)
+        item_series_key = build_series_key(
+            normalized_item.title, normalized_item.author
+        )
         if existing_index is None:
             existing_index = series_index.get(item_series_key)
 
         if existing_index is None:
-            merged.append(item)
+            merged.append(normalized_item)
             index = len(merged) - 1
-            id_index[item.id] = index
+            id_index[normalized_item.id] = index
             series_index[item_series_key] = index
             continue
 
-        merged_item = merge_library_item(merged[existing_index], item)
+        merged_item = merge_library_item(merged[existing_index], normalized_item)
         merged[existing_index] = merged_item
 
         merged_series_key = build_series_key(merged_item.title, merged_item.author)
         id_index[merged_item.id] = existing_index
-        id_index[item.id] = existing_index
+        id_index[normalized_item.id] = existing_index
         series_index[item_series_key] = existing_index
         series_index[merged_series_key] = existing_index
 
     return merged
+
+
+def normalize_library_item(item: LibraryItem) -> LibraryItem:
+    extracted_volume = extract_volume_number(item.title) or 0
+    owned_candidates = [to_non_negative_int(value) for value in item.owned_volumes]
+    if extracted_volume > 0:
+        owned_candidates.append(extracted_volume)
+
+    max_owned = max(owned_candidates, default=0)
+    latest_volume = max(
+        1, to_non_negative_int(item.latest_volume), extracted_volume, max_owned
+    )
+
+    return LibraryItem(
+        id=item.id,
+        title=item.title,
+        author=item.author,
+        publisher=item.publisher,
+        published_date=item.published_date,
+        latest_volume=latest_volume,
+        owned_volumes=normalize_owned_volumes(owned_candidates, latest_volume),
+        next_release_date=item.next_release_date,
+        is_favorite=item.is_favorite,
+        notes=item.notes,
+        cover_url=item.cover_url,
+        genre=item.genre,
+        isbn=item.isbn,
+        source=item.source,
+        source_url=item.source_url,
+    )
 
 
 def merge_library_item(existing: LibraryItem, incoming: LibraryItem) -> LibraryItem:
@@ -169,26 +207,28 @@ def merge_library_item(existing: LibraryItem, incoming: LibraryItem) -> LibraryI
     if incoming_volume > 0:
         owned_candidates.append(incoming_volume)
 
-    return LibraryItem(
-        id=existing.id,
-        title=pick_existing_required(existing.title, incoming.title),
-        author=pick_existing_required(existing.author, incoming.author),
-        publisher=pick_existing_optional(existing.publisher, incoming.publisher),
-        published_date=pick_existing_optional(
-            existing.published_date, incoming.published_date
-        ),
-        latest_volume=latest_volume,
-        owned_volumes=normalize_owned_volumes(owned_candidates, latest_volume),
-        next_release_date=pick_existing_optional(
-            existing.next_release_date, incoming.next_release_date
-        ),
-        is_favorite=existing.is_favorite or incoming.is_favorite,
-        notes=pick_existing_required(existing.notes, incoming.notes),
-        cover_url=pick_existing_required(existing.cover_url, incoming.cover_url),
-        genre=merge_genre(existing.genre, incoming.genre),
-        isbn=pick_existing_optional(existing.isbn, incoming.isbn),
-        source=pick_existing_optional(existing.source, incoming.source),
-        source_url=pick_existing_optional(existing.source_url, incoming.source_url),
+    return normalize_library_item(
+        LibraryItem(
+            id=existing.id,
+            title=pick_existing_required(existing.title, incoming.title),
+            author=pick_existing_required(existing.author, incoming.author),
+            publisher=pick_existing_optional(existing.publisher, incoming.publisher),
+            published_date=pick_existing_optional(
+                existing.published_date, incoming.published_date
+            ),
+            latest_volume=latest_volume,
+            owned_volumes=normalize_owned_volumes(owned_candidates, latest_volume),
+            next_release_date=pick_existing_optional(
+                existing.next_release_date, incoming.next_release_date
+            ),
+            is_favorite=existing.is_favorite or incoming.is_favorite,
+            notes=pick_existing_required(existing.notes, incoming.notes),
+            cover_url=pick_existing_required(existing.cover_url, incoming.cover_url),
+            genre=merge_genre(existing.genre, incoming.genre),
+            isbn=pick_existing_optional(existing.isbn, incoming.isbn),
+            source=pick_existing_optional(existing.source, incoming.source),
+            source_url=pick_existing_optional(existing.source_url, incoming.source_url),
+        )
     )
 
 
