@@ -1,5 +1,6 @@
 import { MangaSeries } from '@domain/entities/MangaSeries';
 import {
+  GoogleDriveLibraryBackup,
   GoogleDriveBackupRepository,
   GoogleDriveSyncResult
 } from '@domain/repositories/GoogleDriveBackupRepository';
@@ -22,6 +23,18 @@ type GoogleTokenResponse = {
 
 type GoogleTokenClient = {
   requestAccessToken: (options?: { prompt?: '' | 'consent' }) => void;
+};
+
+type DriveFileSummary = {
+  id: string;
+  name: string;
+  createdTime?: string;
+  modifiedTime?: string;
+};
+
+type BackupPayload = {
+  exportedAt?: unknown;
+  items?: unknown;
 };
 
 let gsiLoadingPromise: Promise<void> | null = null;
@@ -73,6 +86,97 @@ function buildMultipartBody(
     `--${boundary}--`,
     ''
   ].join('\r\n');
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return toNonEmptyString(value);
+}
+
+function toRequiredString(value: unknown): string | null {
+  return toNonEmptyString(value);
+}
+
+function normalizeLatestVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(value));
+}
+
+function normalizeOwnedVolumes(value: unknown, latestVolume: number): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const normalized = value
+    .map((volume) => (typeof volume === 'number' ? Math.floor(volume) : Number.NaN))
+    .filter(
+      (volume) =>
+        Number.isFinite(volume) && volume > 0 && (latestVolume === 0 || volume <= latestVolume)
+    );
+
+  return Array.from(new Set(normalized)).sort((a, b) => a - b);
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => toNonEmptyString(item))
+    .filter((item): item is string => item !== null);
+}
+
+function toMangaSeries(value: unknown): MangaSeries | null {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const id = toRequiredString(value.id);
+  const title = toRequiredString(value.title);
+  const author = toRequiredString(value.author);
+  const coverUrl = toRequiredString(value.coverUrl);
+
+  if (!id || !title || !author || !coverUrl) {
+    return null;
+  }
+
+  const latestVolume = normalizeLatestVolume(value.latestVolume);
+  const notesRaw = value.notes;
+
+  return {
+    id,
+    title,
+    author,
+    publisher: toNullableString(value.publisher),
+    publishedDate: toNullableString(value.publishedDate),
+    latestVolume,
+    ownedVolumes: normalizeOwnedVolumes(value.ownedVolumes, latestVolume),
+    nextReleaseDate: toNullableString(value.nextReleaseDate),
+    isFavorite: typeof value.isFavorite === 'boolean' ? value.isFavorite : false,
+    notes: typeof notesRaw === 'string' ? notesRaw : '',
+    coverUrl,
+    genre: normalizeStringArray(value.genre),
+    isbn: toNullableString(value.isbn),
+    source: toNullableString(value.source),
+    sourceUrl: toNullableString(value.sourceUrl)
+  };
 }
 
 async function extractGoogleApiErrorDetail(response: Response): Promise<string> {
@@ -291,6 +395,126 @@ export class GoogleDriveBackupApiRepository implements GoogleDriveBackupReposito
       },
       body
     });
+  }
+
+  private async findLatestBackupFile(
+    accessToken: string,
+    parentFolderId: string
+  ): Promise<DriveFileSummary | null> {
+    const query =
+      `'${parentFolderId}' in parents` +
+      ` and mimeType='${DRIVE_FILE_MIME_TYPE}'` +
+      " and name contains 'mangashelf-backup-'" +
+      ' and trashed=false';
+    const url =
+      `${DRIVE_FILES_ENDPOINT}?` +
+      `q=${encodeURIComponent(query)}` +
+      '&spaces=drive&fields=files(id,name,createdTime,modifiedTime)&orderBy=createdTime desc&pageSize=1';
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      const detail = await extractGoogleApiErrorDetail(response);
+      throw new Error(`Google Driveバックアップ検索に失敗しました: ${detail}`);
+    }
+
+    const data = (await response.json()) as {
+      files?: Array<{
+        id?: string;
+        name?: string;
+        createdTime?: string;
+        modifiedTime?: string;
+      }>;
+    };
+
+    const latest = data.files?.[0];
+    if (!latest?.id || !latest.name) {
+      return null;
+    }
+
+    return {
+      id: latest.id,
+      name: latest.name,
+      createdTime: latest.createdTime,
+      modifiedTime: latest.modifiedTime
+    };
+  }
+
+  private async downloadBackupFile(
+    accessToken: string,
+    file: DriveFileSummary
+  ): Promise<GoogleDriveLibraryBackup> {
+    const response = await fetch(
+      `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(file.id)}?alt=media`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const detail = await extractGoogleApiErrorDetail(response);
+      throw new Error(`Google Driveバックアップ取得に失敗しました: ${detail}`);
+    }
+
+    let rawPayload: unknown;
+    try {
+      rawPayload = (await response.json()) as unknown;
+    } catch {
+      throw new Error('Google DriveバックアップのJSON解析に失敗しました。');
+    }
+
+    if (!isObject(rawPayload)) {
+      throw new Error('Google Driveバックアップの形式が不正です。');
+    }
+
+    const payload = rawPayload as BackupPayload;
+    if (!Array.isArray(payload.items)) {
+      throw new Error('Google Driveバックアップに items 配列がありません。');
+    }
+
+    const parsedItems = payload.items
+      .map((item) => toMangaSeries(item))
+      .filter((item): item is MangaSeries => item !== null);
+
+    if (payload.items.length > 0 && parsedItems.length === 0) {
+      throw new Error('Google Driveバックアップに復元可能な本棚データがありません。');
+    }
+
+    return {
+      fileId: file.id,
+      fileName: file.name,
+      syncedAt:
+        toNonEmptyString(payload.exportedAt) ??
+        toNonEmptyString(file.modifiedTime) ??
+        toNonEmptyString(file.createdTime) ??
+        new Date().toISOString(),
+      items: parsedItems
+    };
+  }
+
+  async getLatestLibraryBackup(): Promise<GoogleDriveLibraryBackup | null> {
+    const accessToken = await this.getAccessToken();
+    const folderId = await this.findBackupFolderId(accessToken);
+    if (!folderId) {
+      this.backupFolderId = null;
+      return null;
+    }
+
+    this.backupFolderId = folderId;
+    const latestFile = await this.findLatestBackupFile(accessToken, folderId);
+    if (!latestFile) {
+      return null;
+    }
+
+    return this.downloadBackupFile(accessToken, latestFile);
   }
 
   async syncLibrary(items: MangaSeries[]): Promise<GoogleDriveSyncResult> {

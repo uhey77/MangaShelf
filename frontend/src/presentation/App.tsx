@@ -56,12 +56,16 @@ export default function App() {
   const [libraryQuery, setLibraryQuery] = useState('');
   const [selectedSeries, setSelectedSeries] = useState<MangaSeries | null>(null);
 
-  const { library, libraryError, updateSeries } = useLibrary();
+  const { library, libraryError, updateSeries, replaceLibrary } = useLibrary();
   const {
     settings,
     settingsError,
     googleDriveSyncing,
     googleDriveSyncError,
+    googleDriveRestoring,
+    googleDriveRestoreError,
+    googleDriveBidirectionalSyncing,
+    googleDriveBidirectionalSyncError,
     notificationPermission,
     notificationSupported,
     notificationStatusMessage,
@@ -69,8 +73,13 @@ export default function App() {
     setShelfSort,
     setShelfGridColumns,
     setNotificationsEnabled,
-    syncGoogleDriveBackup
-  } = useAppSettings(library);
+    syncGoogleDriveBackup,
+    restoreGoogleDriveBackup,
+    syncGoogleDriveBidirectionally
+  } = useAppSettings({
+    library,
+    onLibraryReplace: replaceLibrary
+  });
   const {
     searchForm,
     setSearchForm,
@@ -287,11 +296,17 @@ export default function App() {
                   settingsError={settingsError}
                   googleDriveSyncing={googleDriveSyncing}
                   googleDriveSyncError={googleDriveSyncError}
+                  googleDriveRestoring={googleDriveRestoring}
+                  googleDriveRestoreError={googleDriveRestoreError}
+                  googleDriveBidirectionalSyncing={googleDriveBidirectionalSyncing}
+                  googleDriveBidirectionalSyncError={googleDriveBidirectionalSyncError}
                   notificationPermission={notificationPermission}
                   notificationSupported={notificationSupported}
                   notificationStatusMessage={notificationStatusMessage}
                   onNotificationsChange={setNotificationsEnabled}
                   onGoogleDriveSync={syncGoogleDriveBackup}
+                  onGoogleDriveRestore={restoreGoogleDriveBackup}
+                  onGoogleDriveBidirectionalSync={syncGoogleDriveBidirectionally}
                 />
               ) : activeTab === 'search' ? (
                 <div className="space-y-4">
@@ -922,26 +937,40 @@ function SettingsView({
   settingsError,
   googleDriveSyncing,
   googleDriveSyncError,
+  googleDriveRestoring,
+  googleDriveRestoreError,
+  googleDriveBidirectionalSyncing,
+  googleDriveBidirectionalSyncError,
   notificationPermission,
   notificationSupported,
   notificationStatusMessage,
   onNotificationsChange,
-  onGoogleDriveSync
+  onGoogleDriveSync,
+  onGoogleDriveRestore,
+  onGoogleDriveBidirectionalSync
 }: {
   isDark: boolean;
   settings: AppSettings;
   settingsError: string | null;
   googleDriveSyncing: boolean;
   googleDriveSyncError: string | null;
+  googleDriveRestoring: boolean;
+  googleDriveRestoreError: string | null;
+  googleDriveBidirectionalSyncing: boolean;
+  googleDriveBidirectionalSyncError: string | null;
   notificationPermission: NotificationPermissionState;
   notificationSupported: boolean;
   notificationStatusMessage: string;
   onNotificationsChange: (enabled: boolean) => Promise<void>;
   onGoogleDriveSync: () => Promise<void>;
+  onGoogleDriveRestore: () => Promise<void>;
+  onGoogleDriveBidirectionalSync: () => Promise<void>;
 }) {
   const cardClass = isDark
     ? 'rounded-xl border border-zinc-800 bg-zinc-900 p-4'
     : 'rounded-xl border border-zinc-200 bg-white p-4';
+  const googleDriveBusy =
+    googleDriveSyncing || googleDriveRestoring || googleDriveBidirectionalSyncing;
 
   const googleDriveSyncLabel = (() => {
     const raw = settings.googleDriveLastSyncedAt;
@@ -983,14 +1012,14 @@ function SettingsView({
         <div className="space-y-2">
           <SettingsItem
             icon={<CloudUpload className="text-blue-500" />}
-            title="Google Drive バックアップ"
-            description={`前回同期: ${googleDriveSyncLabel}`}
+            title="Google Drive にバックアップ"
+            description={`保存先: Drive > MangaShelf / 前回同期: ${googleDriveSyncLabel}`}
             action={
               <button
                 type="button"
                 onClick={() => void onGoogleDriveSync()}
-                disabled={googleDriveSyncing}
-                className={`text-xs font-bold ${googleDriveSyncing ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+                disabled={googleDriveBusy}
+                className={`text-xs font-bold ${googleDriveBusy ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
               >
                 {googleDriveSyncing ? (
                   <span className="inline-flex items-center gap-1">
@@ -1010,10 +1039,54 @@ function SettingsView({
           )}
           <SettingsItem
             icon={<ArrowUpDown className="text-zinc-400" />}
-            title="データのインポート/エクスポート"
-            description="準備中"
-            action={<span className="text-xs font-semibold text-zinc-400">準備中</span>}
+            title="Drive から復元"
+            description="最新バックアップで本棚データを置き換えます"
+            action={
+              <button
+                type="button"
+                onClick={() => void onGoogleDriveRestore()}
+                disabled={googleDriveBusy}
+                className={`text-xs font-bold ${googleDriveBusy ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+              >
+                {googleDriveRestoring ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    復元中
+                  </span>
+                ) : (
+                  '復元する'
+                )}
+              </button>
+            }
           />
+          {googleDriveRestoreError && (
+            <p className="px-1 text-[11px] text-rose-500">{googleDriveRestoreError}</p>
+          )}
+          <SettingsItem
+            icon={<ArrowUpDown className="text-emerald-500" />}
+            title="Drive と双方向同期"
+            description="ID重複はローカル優先でマージし、Driveにも反映します"
+            action={
+              <button
+                type="button"
+                onClick={() => void onGoogleDriveBidirectionalSync()}
+                disabled={googleDriveBusy}
+                className={`text-xs font-bold ${googleDriveBusy ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+              >
+                {googleDriveBidirectionalSyncing ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    同期中
+                  </span>
+                ) : (
+                  '双方向同期'
+                )}
+              </button>
+            }
+          />
+          {googleDriveBidirectionalSyncError && (
+            <p className="px-1 text-[11px] text-rose-500">{googleDriveBidirectionalSyncError}</p>
+          )}
         </div>
       </section>
 

@@ -13,6 +13,8 @@ import { useAppContainer } from '@presentation/providers/AppProvider';
 const LOAD_ERROR_MESSAGE = '設定の読み込みに失敗しました';
 const SAVE_ERROR_MESSAGE = '設定の保存に失敗しました';
 const GOOGLE_DRIVE_SYNC_ERROR_MESSAGE = 'Google Driveとの同期に失敗しました';
+const GOOGLE_DRIVE_RESTORE_ERROR_MESSAGE = 'Google Driveからの復元に失敗しました';
+const GOOGLE_DRIVE_BIDIRECTIONAL_SYNC_ERROR_MESSAGE = 'Google Driveとの双方向同期に失敗しました';
 const APP_NOTIFICATION_KEY = 'manga_shelf.release_notifications.v1';
 const NOTIFICATION_WINDOW_DAYS = 7;
 
@@ -85,13 +87,30 @@ function toReleaseKey(series: MangaSeries): string | null {
   return `${series.id}:${series.nextReleaseDate}`;
 }
 
-export function useAppSettings(library: MangaSeries[]) {
-  const { getAppSettings, saveAppSettings, syncLibraryToGoogleDrive } = useAppContainer();
+export interface UseAppSettingsParams {
+  library: MangaSeries[];
+  onLibraryReplace: (items: MangaSeries[]) => void;
+}
+
+export function useAppSettings({ library, onLibraryReplace }: UseAppSettingsParams) {
+  const {
+    getAppSettings,
+    saveAppSettings,
+    syncLibraryToGoogleDrive,
+    restoreLibraryFromGoogleDrive,
+    syncLibraryBidirectionallyWithGoogleDrive
+  } = useAppContainer();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [googleDriveSyncing, setGoogleDriveSyncing] = useState(false);
   const [googleDriveSyncError, setGoogleDriveSyncError] = useState<string | null>(null);
+  const [googleDriveRestoring, setGoogleDriveRestoring] = useState(false);
+  const [googleDriveRestoreError, setGoogleDriveRestoreError] = useState<string | null>(null);
+  const [googleDriveBidirectionalSyncing, setGoogleDriveBidirectionalSyncing] = useState(false);
+  const [googleDriveBidirectionalSyncError, setGoogleDriveBidirectionalSyncError] = useState<
+    string | null
+  >(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(
     () => getNotificationPermissionState()
   );
@@ -269,6 +288,59 @@ export function useAppSettings(library: MangaSeries[]) {
     }
   }, [library, syncLibraryToGoogleDrive]);
 
+  const restoreGoogleDriveBackup = useCallback(async () => {
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm('現在の本棚データを最新バックアップで置き換えます。よろしいですか？')
+    ) {
+      return;
+    }
+
+    setGoogleDriveRestoring(true);
+    setGoogleDriveRestoreError(null);
+
+    try {
+      const result = await restoreLibraryFromGoogleDrive.handle();
+      onLibraryReplace(result.restoredItems);
+      setSettings((prev) => ({
+        ...prev,
+        googleDriveLinked: true,
+        googleDriveLastSyncedAt: result.restoredFrom
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setGoogleDriveRestoreError(error.message);
+      } else {
+        setGoogleDriveRestoreError(GOOGLE_DRIVE_RESTORE_ERROR_MESSAGE);
+      }
+    } finally {
+      setGoogleDriveRestoring(false);
+    }
+  }, [onLibraryReplace, restoreLibraryFromGoogleDrive]);
+
+  const syncGoogleDriveBidirectionally = useCallback(async () => {
+    setGoogleDriveBidirectionalSyncing(true);
+    setGoogleDriveBidirectionalSyncError(null);
+
+    try {
+      const result = await syncLibraryBidirectionallyWithGoogleDrive.handle();
+      onLibraryReplace(result.mergedItems);
+      setSettings((prev) => ({
+        ...prev,
+        googleDriveLinked: true,
+        googleDriveLastSyncedAt: result.syncedAt
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setGoogleDriveBidirectionalSyncError(error.message);
+      } else {
+        setGoogleDriveBidirectionalSyncError(GOOGLE_DRIVE_BIDIRECTIONAL_SYNC_ERROR_MESSAGE);
+      }
+    } finally {
+      setGoogleDriveBidirectionalSyncing(false);
+    }
+  }, [onLibraryReplace, syncLibraryBidirectionallyWithGoogleDrive]);
+
   const notificationSupported = notificationPermission !== 'unsupported';
 
   const notificationStatusMessage = useMemo(() => {
@@ -289,6 +361,10 @@ export function useAppSettings(library: MangaSeries[]) {
     settingsError,
     googleDriveSyncing,
     googleDriveSyncError,
+    googleDriveRestoring,
+    googleDriveRestoreError,
+    googleDriveBidirectionalSyncing,
+    googleDriveBidirectionalSyncError,
     notificationPermission,
     notificationSupported,
     notificationStatusMessage,
@@ -297,6 +373,8 @@ export function useAppSettings(library: MangaSeries[]) {
     setShelfSort,
     setShelfGridColumns,
     setNotificationsEnabled,
-    syncGoogleDriveBackup
+    syncGoogleDriveBackup,
+    restoreGoogleDriveBackup,
+    syncGoogleDriveBidirectionally
   };
 }
