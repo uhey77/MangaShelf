@@ -84,7 +84,9 @@
 │       ├── application/
 │       │   ├── commands/
 │       │   │   ├── DeleteLibraryItem.ts
+│       │   │   ├── RestoreLibraryFromGoogleDrive.ts
 │       │   │   ├── SaveAppSettings.ts
+│       │   │   ├── SyncLibraryBidirectionallyWithGoogleDrive.ts
 │       │   │   ├── SyncLibraryToGoogleDrive.ts
 │       │   │   └── UpsertLibraryItem.ts
 │       │   └── queries/
@@ -213,7 +215,9 @@
 | `frontend/src/domain/search.ts` | 検索クエリ・検索結果の型。 |
 | `frontend/src/application/` | アプリケーション層（ユースケース）。 |
 | `frontend/src/application/commands/` | コマンド（書き込みユースケース）。 |
+| `frontend/src/application/commands/RestoreLibraryFromGoogleDrive.ts` | Google Drive 最新バックアップから本棚データを復元するコマンド。 |
 | `frontend/src/application/commands/SaveAppSettings.ts` | アプリ設定保存コマンド。 |
+| `frontend/src/application/commands/SyncLibraryBidirectionallyWithGoogleDrive.ts` | ローカル本棚と Drive バックアップをマージして双方向同期するコマンド。 |
 | `frontend/src/application/commands/SyncLibraryToGoogleDrive.ts` | Google Drive 同期コマンド。 |
 | `frontend/src/application/queries/` | クエリ（読み取りユースケース）。 |
 | `frontend/src/application/queries/GetAppSettings.ts` | アプリ設定取得クエリ。 |
@@ -222,12 +226,12 @@
 | `frontend/src/infrastructure/http/` | fetch 共通処理。 |
 | `frontend/src/infrastructure/mappers/` | API DTO とドメイン型の変換。 |
 | `frontend/src/infrastructure/repositories/` | API 実装リポジトリ。 |
-| `frontend/src/infrastructure/repositories/GoogleDriveBackupApiRepository.ts` | Google Drive API / GIS 連携によるバックアップ実装。 |
+| `frontend/src/infrastructure/repositories/GoogleDriveBackupApiRepository.ts` | Google Drive API / GIS 連携によるバックアップ・復元実装。 |
 | `frontend/src/infrastructure/repositories/LocalStorageAppSettingsRepository.ts` | localStorage を使ったアプリ設定永続化実装。 |
 | `frontend/src/presentation/` | プレゼンテーション層（UI）。 |
 | `frontend/src/presentation/App.tsx` | 画面全体のメインコンポーネント。 |
 | `frontend/src/presentation/hooks/` | UI 向け hooks。 |
-| `frontend/src/presentation/hooks/useAppSettings.ts` | 設定読み書き・通知権限・起動時通知・Drive同期の UI ロジック。 |
+| `frontend/src/presentation/hooks/useAppSettings.ts` | 設定読み書き・通知権限・起動時通知・Drive同期/復元の UI ロジック。 |
 | `frontend/src/presentation/providers/` | DI コンテナの Provider。 |
 | `frontend/src/presentation/utils/` | 表示用ユーティリティ。 |
 | `frontend/src/components/` | UI コンポーネント群。 |
@@ -261,7 +265,7 @@
 | フロントエンド | Web Storage API (localStorage) | 設定永続化 | テーマ・通知・表示設定を保存 |
 | フロントエンド | Web Notification API | 新刊通知 | 7日以内の次巻発売を起動時に通知 |
 | フロントエンド | Google Identity Services | Google OAuth | Drive 同期用アクセストークン取得 |
-| フロントエンド | Google Drive API | クラウドバックアップ | 本棚データ JSON をアップロード |
+| フロントエンド | Google Drive API | クラウドバックアップ/復元 | 本棚データ JSON のアップロード・取得・双方向同期 |
 | バックエンド | Python | API 実装 | FastAPI で構築 |
 | バックエンド | FastAPI | Web API | `/api` を提供 |
 | バックエンド | requests | 外部検索 | NDL OpenSearch / 楽天ブックス API / Google Books API を利用 |
