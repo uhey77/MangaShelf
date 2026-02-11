@@ -1011,6 +1011,7 @@ function SettingsView({
         </h3>
         <div className="space-y-2">
           <SettingsItem
+            isDark={isDark}
             icon={<CloudUpload className="text-blue-500" />}
             title="Google Drive にバックアップ"
             description={`保存先: Drive > MangaShelf / 前回同期: ${googleDriveSyncLabel}`}
@@ -1038,6 +1039,7 @@ function SettingsView({
             <p className="px-1 text-[11px] text-rose-500">{googleDriveSyncError}</p>
           )}
           <SettingsItem
+            isDark={isDark}
             icon={<ArrowUpDown className="text-zinc-400" />}
             title="Drive から復元"
             description="最新バックアップで本棚データを置き換えます"
@@ -1063,6 +1065,7 @@ function SettingsView({
             <p className="px-1 text-[11px] text-rose-500">{googleDriveRestoreError}</p>
           )}
           <SettingsItem
+            isDark={isDark}
             icon={<ArrowUpDown className="text-emerald-500" />}
             title="Drive と双方向同期"
             description="ID重複はローカル優先でマージし、Driveにも反映します"
@@ -1131,6 +1134,7 @@ function SettingsView({
         <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">データ</h3>
         <div className="space-y-2">
           <SettingsItem
+            isDark={isDark}
             icon={<Library size={18} className="text-zinc-400" />}
             title="データソース"
             description="国立国会図書館サーチ API"
@@ -1138,7 +1142,7 @@ function SettingsView({
         </div>
       </section>
 
-      <div className="mt-8 p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-center">
+      <div className={`mt-8 p-4 rounded-2xl text-center ${isDark ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
         <p className="text-xs text-zinc-500">Manga Shelf v1.0.0</p>
       </div>
     </div>
@@ -1146,19 +1150,25 @@ function SettingsView({
 }
 
 function SettingsItem({
+  isDark,
   icon,
   title,
   description,
   action
 }: {
+  isDark: boolean;
   icon: React.ReactNode;
   title: string;
   description?: string;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
-      <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800">{icon}</div>
+    <div
+      className={`flex items-center gap-4 p-3 rounded-xl border ${
+        isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-100'
+      }`}
+    >
+      <div className={`p-2 rounded-lg ${isDark ? 'bg-zinc-800' : 'bg-zinc-50'}`}>{icon}</div>
       <div className="flex-1 min-w-0">
         <h4 className="text-sm font-bold truncate">{title}</h4>
         {description && <p className="text-[11px] text-zinc-500 truncate">{description}</p>}
