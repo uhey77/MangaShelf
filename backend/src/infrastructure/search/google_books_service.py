@@ -44,7 +44,9 @@ class GoogleBooksService(BookSearchService):
                 self._endpoint, params=params, timeout=self._timeout_seconds
             )
         except requests.RequestException as exc:
-            raise SearchServiceError("Google Books APIに接続できませんでした。") from exc
+            raise SearchServiceError(
+                "Google Books APIに接続できませんでした。"
+            ) from exc
 
         if response.status_code != 200:
             raise SearchServiceError("Google Books APIからの応答が不正です。")
@@ -78,10 +80,26 @@ def build_query(query: SearchQuery) -> str:
 
 def parse_total(data: dict[str, Any]) -> int:
     value = data.get("totalItems")
-    try:
+    if isinstance(value, bool):
         return int(value)
-    except (TypeError, ValueError):
-        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return 0
+        try:
+            return int(raw)
+        except ValueError:
+            return 0
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
 
 
 def build_items(raw_items: List[dict[str, Any]]) -> List[LibraryItem]:
@@ -144,7 +162,14 @@ def extract_isbn(identifiers: List[dict[str, Any]]) -> Optional[str]:
 
 
 def extract_cover_url(image_links: dict[str, Any]) -> str:
-    for key in ("extraLarge", "large", "medium", "small", "thumbnail", "smallThumbnail"):
+    for key in (
+        "extraLarge",
+        "large",
+        "medium",
+        "small",
+        "thumbnail",
+        "smallThumbnail",
+    ):
         value = str(image_links.get(key) or "").strip()
         if value:
             return value
