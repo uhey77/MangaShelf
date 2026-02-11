@@ -1129,22 +1129,6 @@ function SettingsView({
           </div>
         </div>
       </section>
-
-      <section>
-        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">データ</h3>
-        <div className="space-y-2">
-          <SettingsItem
-            isDark={isDark}
-            icon={<Library size={18} className="text-zinc-400" />}
-            title="データソース"
-            description="国立国会図書館サーチ API"
-          />
-        </div>
-      </section>
-
-      <div className={`mt-8 p-4 rounded-2xl text-center ${isDark ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
-        <p className="text-xs text-zinc-500">Manga Shelf v1.0.0</p>
-      </div>
     </div>
   );
 }
