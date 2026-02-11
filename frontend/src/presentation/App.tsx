@@ -21,28 +21,65 @@ import {
   Plus,
   Loader2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 
+import { AppSettings, ShelfGridColumns, ShelfSort } from '@domain/entities/AppSettings';
 import { MangaSeries } from '@domain/entities/MangaSeries';
 import { ImageWithFallback } from '@components/figma/ImageWithFallback';
+import { useAppSettings } from '@presentation/hooks/useAppSettings';
 import { useLibrary } from '@presentation/hooks/useLibrary';
 import { useSearch } from '@presentation/hooks/useSearch';
 import { buildMetaLine, formatDate } from '@presentation/utils/formatters';
 
-const ThemeContext = React.createContext({
-  isDark: false,
-  toggleTheme: () => {}
-});
+type ActiveTab = 'shelf' | 'search' | 'favorites' | 'settings';
+type NotificationPermissionState = NotificationPermission | 'unsupported';
+
+function sortLibraryItems(items: MangaSeries[], sort: ShelfSort): MangaSeries[] {
+  const sorted = [...items];
+
+  if (sort === 'latestVolumeDesc') {
+    sorted.sort((a, b) => {
+      if (b.latestVolume !== a.latestVolume) {
+        return b.latestVolume - a.latestVolume;
+      }
+      return a.title.localeCompare(b.title, 'ja');
+    });
+    return sorted;
+  }
+
+  sorted.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+  return sorted;
+}
 
 export default function App() {
-  const [isDark, setIsDark] = useState(false);
-  const [activeTab, setActiveTab] = useState<'shelf' | 'search' | 'favorites' | 'settings'>(
-    'shelf'
-  );
+  const [activeTab, setActiveTab] = useState<ActiveTab>('shelf');
   const [libraryQuery, setLibraryQuery] = useState('');
   const [selectedSeries, setSelectedSeries] = useState<MangaSeries | null>(null);
 
-  const { library, libraryError, updateSeries } = useLibrary();
+  const { library, libraryError, updateSeries, replaceLibrary } = useLibrary();
+  const {
+    settings,
+    settingsError,
+    googleDriveSyncing,
+    googleDriveSyncError,
+    googleDriveRestoring,
+    googleDriveRestoreError,
+    googleDriveBidirectionalSyncing,
+    googleDriveBidirectionalSyncError,
+    notificationPermission,
+    notificationSupported,
+    notificationStatusMessage,
+    toggleThemeMode,
+    setShelfSort,
+    setShelfGridColumns,
+    setNotificationsEnabled,
+    syncGoogleDriveBackup,
+    restoreGoogleDriveBackup,
+    syncGoogleDriveBidirectionally
+  } = useAppSettings({
+    library,
+    onLibraryReplace: replaceLibrary
+  });
   const {
     searchForm,
     setSearchForm,
@@ -58,7 +95,7 @@ export default function App() {
     clearSearch
   } = useSearch();
 
-  const toggleTheme = () => setIsDark(!isDark);
+  const isDark = settings.themeMode === 'dark';
 
   const libraryIndex = useMemo(() => new Map(library.map((item) => [item.id, item])), [library]);
 
@@ -86,126 +123,43 @@ export default function App() {
         return title.includes(query) || author.includes(query) || publisher.includes(query);
       });
     }
+
     if (activeTab === 'favorites') {
       result = result.filter((item) => item.isFavorite);
     }
+
+    if (activeTab === 'shelf' || activeTab === 'favorites') {
+      result = sortLibraryItems(result, settings.shelfSort);
+    }
+
     return result;
-  }, [library, libraryQuery, activeTab]);
+  }, [activeTab, library, libraryQuery, settings.shelfSort]);
 
   const totalSearchPages = Math.max(1, Math.ceil(Math.min(searchTotal, 500) / searchLimit));
+  const shelfGridClass = settings.shelfGridColumns === 2 ? 'grid-cols-2' : 'grid-cols-1';
+  const useCompactShelfCard = settings.shelfGridColumns === 2;
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
-      <div
-        className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}
-      >
-        {/* Header */}
-        <header className="sticky top-0 z-40 backdrop-blur-md bg-opacity-80 border-b border-zinc-200 dark:border-zinc-800 px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight">Manga Shelf</h1>
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-          >
-            {isDark ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-        </header>
+    <div
+      className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}
+    >
+      {/* Header */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-opacity-80 border-b border-zinc-200 dark:border-zinc-800 px-4 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-tight">Manga Shelf</h1>
+        <button
+          onClick={toggleThemeMode}
+          className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+          aria-label="テーマを切り替える"
+        >
+          {isDark ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+      </header>
 
-        {/* Search Area */}
-        {activeTab !== 'settings' && !selectedSeries && (
-          <div className="px-4 py-3 space-y-3">
-            {activeTab === 'search' ? (
-              <form onSubmit={handleSearchSubmit} className="space-y-3">
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                    size={18}
-                  />
-                  <input
-                    type="text"
-                    placeholder="キーワード検索"
-                    className={`w-full pl-10 pr-10 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none transition-all`}
-                    value={searchForm.q}
-                    onChange={(e) => setSearchForm((prev) => ({ ...prev, q: e.target.value }))}
-                  />
-                  {searchForm.q && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchForm((prev) => ({ ...prev, q: '' }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
-                      aria-label="キーワードをクリア"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <input
-                    type="text"
-                    placeholder="タイトル"
-                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
-                    value={searchForm.title}
-                    onChange={(e) => setSearchForm((prev) => ({ ...prev, title: e.target.value }))}
-                  />
-                  <input
-                    type="text"
-                    placeholder="著者"
-                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
-                    value={searchForm.author}
-                    onChange={(e) => setSearchForm((prev) => ({ ...prev, author: e.target.value }))}
-                  />
-                  <input
-                    type="text"
-                    placeholder="出版社"
-                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
-                    value={searchForm.publisher}
-                    onChange={(e) =>
-                      setSearchForm((prev) => ({ ...prev, publisher: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="date"
-                    aria-label="発売日（開始）"
-                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
-                    value={searchForm.from}
-                    onChange={(e) => setSearchForm((prev) => ({ ...prev, from: e.target.value }))}
-                  />
-                  <input
-                    type="date"
-                    aria-label="発売日（終了）"
-                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
-                    value={searchForm.until}
-                    onChange={(e) => setSearchForm((prev) => ({ ...prev, until: e.target.value }))}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    disabled={!hasSearchCondition || searchLoading}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${hasSearchCondition ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-zinc-200 text-zinc-500'} ${searchLoading ? 'opacity-70' : ''}`}
-                  >
-                    {searchLoading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={16} /> 検索中
-                      </span>
-                    ) : (
-                      '検索する'
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearSearch}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium border ${isDark ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-900' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100'} transition-colors`}
-                  >
-                    クリア
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-xs text-zinc-500">
-                  <span>{hasSearchCondition ? `${searchTotal}件` : '検索条件を入力'}</span>
-                </div>
-              </form>
-            ) : (
+      {/* Search Area */}
+      {activeTab !== 'settings' && !selectedSeries && (
+        <div className="px-4 py-3 space-y-3">
+          {activeTab === 'search' ? (
+            <form onSubmit={handleSearchSubmit} className="space-y-3">
               <div className="relative">
                 <Search
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
@@ -213,107 +167,223 @@ export default function App() {
                 />
                 <input
                   type="text"
-                  placeholder="本棚内を検索"
+                  placeholder="キーワード検索"
                   className={`w-full pl-10 pr-10 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none transition-all`}
-                  value={libraryQuery}
-                  onChange={(e) => setLibraryQuery(e.target.value)}
+                  value={searchForm.q}
+                  onChange={(e) => setSearchForm((prev) => ({ ...prev, q: e.target.value }))}
                 />
-                {libraryQuery && (
+                {searchForm.q && (
                   <button
                     type="button"
-                    onClick={() => setLibraryQuery('')}
+                    onClick={() => setSearchForm((prev) => ({ ...prev, q: '' }))}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
-                    aria-label="検索をクリア"
+                    aria-label="キーワードをクリア"
                   >
                     <X size={16} />
                   </button>
                 )}
               </div>
-            )}
-          </div>
-        )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  placeholder="タイトル"
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                  value={searchForm.title}
+                  onChange={(e) => setSearchForm((prev) => ({ ...prev, title: e.target.value }))}
+                />
+                <input
+                  type="text"
+                  placeholder="著者"
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                  value={searchForm.author}
+                  onChange={(e) => setSearchForm((prev) => ({ ...prev, author: e.target.value }))}
+                />
+                <input
+                  type="text"
+                  placeholder="出版社"
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                  value={searchForm.publisher}
+                  onChange={(e) =>
+                    setSearchForm((prev) => ({ ...prev, publisher: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  aria-label="発売日（開始）"
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                  value={searchForm.from}
+                  onChange={(e) => setSearchForm((prev) => ({ ...prev, from: e.target.value }))}
+                />
+                <input
+                  type="date"
+                  aria-label="発売日（終了）"
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none`}
+                  value={searchForm.until}
+                  onChange={(e) => setSearchForm((prev) => ({ ...prev, until: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={!hasSearchCondition || searchLoading}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${hasSearchCondition ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-zinc-200 text-zinc-500'} ${searchLoading ? 'opacity-70' : ''}`}
+                >
+                  {searchLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="animate-spin" size={16} /> 検索中
+                    </span>
+                  ) : (
+                    '検索する'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium border ${isDark ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-900' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100'} transition-colors`}
+                >
+                  クリア
+                </button>
+              </div>
+              <div className="flex items-center justify-between text-xs text-zinc-500">
+                <span>{hasSearchCondition ? `${searchTotal}件` : '検索条件を入力'}</span>
+              </div>
+            </form>
+          ) : (
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="本棚内を検索"
+                className={`w-full pl-10 pr-10 py-2 rounded-xl border ${isDark ? 'bg-zinc-900 border-zinc-800 focus:border-zinc-700' : 'bg-white border-zinc-200 focus:border-zinc-300'} focus:outline-none transition-all`}
+                value={libraryQuery}
+                onChange={(e) => setLibraryQuery(e.target.value)}
+              />
+              {libraryQuery && (
+                <button
+                  type="button"
+                  onClick={() => setLibraryQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  aria-label="検索をクリア"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Main Content Area */}
-        <main className="pb-24">
-          <AnimatePresence mode="wait">
-            {!selectedSeries ? (
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="px-4 space-y-4"
-              >
-                {activeTab === 'settings' ? (
-                  <SettingsView />
-                ) : activeTab === 'search' ? (
-                  <div className="space-y-4">
-                    {searchError && (
-                      <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm">
-                        {searchError}
-                      </div>
-                    )}
-                    {searchLoading && searchResults.length === 0 && (
-                      <div className="py-16 text-center text-zinc-500">
-                        <Loader2 className="mx-auto mb-2 animate-spin" size={32} />
-                        <p>検索しています...</p>
-                      </div>
-                    )}
-                    {!searchLoading && searchResults.length === 0 && hasSearchCondition && (
-                      <div className="py-20 text-center text-zinc-500">
-                        <Library className="mx-auto mb-2 opacity-20" size={48} />
-                        <p>検索結果が見つかりませんでした</p>
-                      </div>
-                    )}
-                    {!searchLoading && searchResults.length === 0 && !hasSearchCondition && (
-                      <div className="py-20 text-center text-zinc-500">
-                        <Search className="mx-auto mb-2 opacity-20" size={48} />
-                        <p>検索条件を入力してください</p>
-                      </div>
-                    )}
-                    {searchResults.length > 0 && (
-                      <div className="grid grid-cols-1 gap-4">
-                        {searchResults.map((item) => {
-                          const isInLibrary = libraryIndex.has(item.id);
-                          return (
-                            <SeriesCard
-                              key={item.id}
-                              item={item}
-                              onClick={() => selectSeriesFromSearch(item)}
-                              isDark={isDark}
-                              statusLabel={isInLibrary ? '所持' : '未所持'}
-                              statusTone={isInLibrary ? 'owned' : 'missing'}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                    {searchResults.length > 0 && totalSearchPages > 1 && (
-                      <div className="flex items-center justify-between text-sm text-zinc-500">
-                        <button
-                          onClick={() => handleSearch(searchPage - 1)}
-                          disabled={searchPage === 1 || searchLoading}
-                          className={`px-3 py-1 rounded-lg border ${isDark ? 'border-zinc-800' : 'border-zinc-200'} disabled:opacity-40`}
-                        >
-                          前へ
-                        </button>
-                        <span>
-                          {searchPage} / {totalSearchPages}
-                        </span>
-                        <button
-                          onClick={() => handleSearch(searchPage + 1)}
-                          disabled={searchPage >= totalSearchPages || searchLoading}
-                          className={`px-3 py-1 rounded-lg border ${isDark ? 'border-zinc-800' : 'border-zinc-200'} disabled:opacity-40`}
-                        >
-                          次へ
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4">
+      {/* Main Content Area */}
+      <main className="pb-24">
+        <AnimatePresence mode="wait">
+          {!selectedSeries ? (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="px-4 space-y-4"
+            >
+              {activeTab === 'settings' ? (
+                <SettingsView
+                  isDark={isDark}
+                  settings={settings}
+                  settingsError={settingsError}
+                  googleDriveSyncing={googleDriveSyncing}
+                  googleDriveSyncError={googleDriveSyncError}
+                  googleDriveRestoring={googleDriveRestoring}
+                  googleDriveRestoreError={googleDriveRestoreError}
+                  googleDriveBidirectionalSyncing={googleDriveBidirectionalSyncing}
+                  googleDriveBidirectionalSyncError={googleDriveBidirectionalSyncError}
+                  notificationPermission={notificationPermission}
+                  notificationSupported={notificationSupported}
+                  notificationStatusMessage={notificationStatusMessage}
+                  onNotificationsChange={setNotificationsEnabled}
+                  onGoogleDriveSync={syncGoogleDriveBackup}
+                  onGoogleDriveRestore={restoreGoogleDriveBackup}
+                  onGoogleDriveBidirectionalSync={syncGoogleDriveBidirectionally}
+                />
+              ) : activeTab === 'search' ? (
+                <div className="space-y-4">
+                  {searchError && (
+                    <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm">
+                      {searchError}
+                    </div>
+                  )}
+                  {searchLoading && searchResults.length === 0 && (
+                    <div className="py-16 text-center text-zinc-500">
+                      <Loader2 className="mx-auto mb-2 animate-spin" size={32} />
+                      <p>検索しています...</p>
+                    </div>
+                  )}
+                  {!searchLoading && searchResults.length === 0 && hasSearchCondition && (
+                    <div className="py-20 text-center text-zinc-500">
+                      <Library className="mx-auto mb-2 opacity-20" size={48} />
+                      <p>検索結果が見つかりませんでした</p>
+                    </div>
+                  )}
+                  {!searchLoading && searchResults.length === 0 && !hasSearchCondition && (
+                    <div className="py-20 text-center text-zinc-500">
+                      <Search className="mx-auto mb-2 opacity-20" size={48} />
+                      <p>検索条件を入力してください</p>
+                    </div>
+                  )}
+                  {searchResults.length > 0 && (
+                    <div className="grid grid-cols-1 gap-4">
+                      {searchResults.map((item) => {
+                        const isInLibrary = libraryIndex.has(item.id);
+                        return (
+                          <SeriesCard
+                            key={item.id}
+                            item={item}
+                            onClick={() => selectSeriesFromSearch(item)}
+                            isDark={isDark}
+                            statusLabel={isInLibrary ? '所持' : '未所持'}
+                            statusTone={isInLibrary ? 'owned' : 'missing'}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                  {searchResults.length > 0 && totalSearchPages > 1 && (
+                    <div className="flex items-center justify-between text-sm text-zinc-500">
+                      <button
+                        onClick={() => handleSearch(searchPage - 1)}
+                        disabled={searchPage === 1 || searchLoading}
+                        className={`px-3 py-1 rounded-lg border ${isDark ? 'border-zinc-800' : 'border-zinc-200'} disabled:opacity-40`}
+                      >
+                        前へ
+                      </button>
+                      <span>
+                        {searchPage} / {totalSearchPages}
+                      </span>
+                      <button
+                        onClick={() => handleSearch(searchPage + 1)}
+                        disabled={searchPage >= totalSearchPages || searchLoading}
+                        className={`px-3 py-1 rounded-lg border ${isDark ? 'border-zinc-800' : 'border-zinc-200'} disabled:opacity-40`}
+                      >
+                        次へ
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <ShelfDisplayControls
+                    isDark={isDark}
+                    activeTab={activeTab}
+                    settings={settings}
+                    onShelfSortChange={setShelfSort}
+                    onShelfGridColumnsChange={setShelfGridColumns}
+                  />
+                  <div className={`grid gap-4 ${shelfGridClass}`}>
                     {libraryError && (
-                      <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm">
+                      <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm col-span-full">
                         {libraryError}
                       </div>
                     )}
@@ -323,64 +393,65 @@ export default function App() {
                         item={item}
                         onClick={() => setSelectedSeries(item)}
                         isDark={isDark}
+                        compact={useCompactShelfCard}
                       />
                     ))}
                     {filteredLibrary.length === 0 && (
-                      <div className="py-20 text-center text-zinc-500">
+                      <div className="py-20 text-center text-zinc-500 col-span-full">
                         <Library className="mx-auto mb-2 opacity-20" size={48} />
                         <p>作品が見つかりませんでした</p>
                       </div>
                     )}
                   </div>
-                )}
-              </motion.div>
-            ) : (
-              <SeriesDetail
-                series={selectedSeries}
-                onBack={() => setSelectedSeries(null)}
-                onUpdate={handleUpdateSeries}
-                isDark={isDark}
-                isInLibrary={libraryIndex.has(selectedSeries.id)}
-              />
-            )}
-          </AnimatePresence>
-        </main>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <SeriesDetail
+              series={selectedSeries}
+              onBack={() => setSelectedSeries(null)}
+              onUpdate={handleUpdateSeries}
+              isDark={isDark}
+              isInLibrary={libraryIndex.has(selectedSeries.id)}
+            />
+          )}
+        </AnimatePresence>
+      </main>
 
-        {/* Bottom Navigation */}
-        {!selectedSeries && (
-          <nav
-            className={`fixed bottom-0 left-0 right-0 z-50 border-t ${isDark ? 'bg-zinc-950/80 border-zinc-800' : 'bg-white/80 border-zinc-200'} backdrop-blur-lg`}
-          >
-            <div className="max-w-md mx-auto flex items-center justify-around py-2">
-              <NavButton
-                active={activeTab === 'shelf'}
-                onClick={() => setActiveTab('shelf')}
-                icon={<Library size={22} />}
-                label="本棚"
-              />
-              <NavButton
-                active={activeTab === 'search'}
-                onClick={() => setActiveTab('search')}
-                icon={<Search size={22} />}
-                label="検索"
-              />
-              <NavButton
-                active={activeTab === 'favorites'}
-                onClick={() => setActiveTab('favorites')}
-                icon={<Heart size={22} />}
-                label="お気に入り"
-              />
-              <NavButton
-                active={activeTab === 'settings'}
-                onClick={() => setActiveTab('settings')}
-                icon={<Settings size={22} />}
-                label="設定"
-              />
-            </div>
-          </nav>
-        )}
-      </div>
-    </ThemeContext.Provider>
+      {/* Bottom Navigation */}
+      {!selectedSeries && (
+        <nav
+          className={`fixed bottom-0 left-0 right-0 z-50 border-t ${isDark ? 'bg-zinc-950/80 border-zinc-800' : 'bg-white/80 border-zinc-200'} backdrop-blur-lg`}
+        >
+          <div className="max-w-md mx-auto flex items-center justify-around py-2">
+            <NavButton
+              active={activeTab === 'shelf'}
+              onClick={() => setActiveTab('shelf')}
+              icon={<Library size={22} />}
+              label="本棚"
+            />
+            <NavButton
+              active={activeTab === 'search'}
+              onClick={() => setActiveTab('search')}
+              icon={<Search size={22} />}
+              label="検索"
+            />
+            <NavButton
+              active={activeTab === 'favorites'}
+              onClick={() => setActiveTab('favorites')}
+              icon={<Heart size={22} />}
+              label="お気に入り"
+            />
+            <NavButton
+              active={activeTab === 'settings'}
+              onClick={() => setActiveTab('settings')}
+              icon={<Settings size={22} />}
+              label="設定"
+            />
+          </div>
+        </nav>
+      )}
+    </div>
   );
 }
 
@@ -408,18 +479,140 @@ function NavButton({
   );
 }
 
+function ShelfDisplayControls({
+  isDark,
+  activeTab,
+  settings,
+  onShelfSortChange,
+  onShelfGridColumnsChange
+}: {
+  isDark: boolean;
+  activeTab: ActiveTab;
+  settings: AppSettings;
+  onShelfSortChange: (sort: ShelfSort) => void;
+  onShelfGridColumnsChange: (columns: ShelfGridColumns) => void;
+}) {
+  const containerClass = isDark
+    ? 'border-zinc-800 bg-zinc-900/80'
+    : 'border-zinc-200 bg-white/90 shadow-sm';
+  const optionPanelClass = isDark
+    ? 'rounded-xl border border-zinc-800 bg-zinc-950/60 p-3'
+    : 'rounded-xl border border-zinc-200 bg-white p-3';
+  const optionButtonBaseClass =
+    'w-full rounded-lg border px-3 py-2 text-xs font-semibold transition-all duration-200';
+  const activeButtonClass = isDark
+    ? 'border-blue-400 bg-blue-500 text-white shadow-md shadow-blue-900/30'
+    : 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-200/80';
+  const inactiveButtonClass = isDark
+    ? 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800'
+    : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100';
+
+  return (
+    <section className={`relative overflow-hidden rounded-2xl border ${containerClass}`}>
+      <div
+        className={`pointer-events-none absolute -top-10 -right-8 h-24 w-24 rounded-full blur-2xl ${isDark ? 'bg-blue-500/20' : 'bg-sky-200/80'}`}
+      />
+      <div className="relative p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={`rounded-xl p-2 ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-500'}`}
+            >
+              <Filter size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">
+                {activeTab === 'favorites' ? 'お気に入り表示設定' : '本棚表示設定'}
+              </h3>
+              <p className="text-xs text-zinc-500 mt-0.5">並び順とグリッドをすばやく切り替え</p>
+            </div>
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-600'}`}
+          >
+            {settings.shelfGridColumns}列
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className={optionPanelClass}>
+            <p className="text-[11px] font-medium text-zinc-500 mb-2">並び順</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={settings.shelfSort === 'title'}
+                onClick={() => onShelfSortChange('title')}
+                className={`${optionButtonBaseClass} ${
+                  settings.shelfSort === 'title' ? activeButtonClass : inactiveButtonClass
+                }`}
+              >
+                タイトル順
+              </button>
+              <button
+                type="button"
+                aria-pressed={settings.shelfSort === 'latestVolumeDesc'}
+                onClick={() => onShelfSortChange('latestVolumeDesc')}
+                className={`${optionButtonBaseClass} ${
+                  settings.shelfSort === 'latestVolumeDesc'
+                    ? activeButtonClass
+                    : inactiveButtonClass
+                }`}
+              >
+                最新巻順
+              </button>
+            </div>
+          </div>
+
+          <div className={optionPanelClass}>
+            <p className="text-[11px] font-medium text-zinc-500 mb-2">グリッド</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={settings.shelfGridColumns === 1}
+                onClick={() => onShelfGridColumnsChange(1)}
+                className={`${optionButtonBaseClass} ${
+                  settings.shelfGridColumns === 1 ? activeButtonClass : inactiveButtonClass
+                }`}
+              >
+                <span>1列</span>
+                <span className="mt-1 block h-1 rounded bg-current/25" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={settings.shelfGridColumns === 2}
+                onClick={() => onShelfGridColumnsChange(2)}
+                className={`${optionButtonBaseClass} ${
+                  settings.shelfGridColumns === 2 ? activeButtonClass : inactiveButtonClass
+                }`}
+              >
+                <span>2列</span>
+                <span className="mt-1 grid grid-cols-2 gap-1">
+                  <span className="h-1 rounded bg-current/25" />
+                  <span className="h-1 rounded bg-current/25" />
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SeriesCard({
   item,
   onClick,
   isDark,
   statusLabel,
-  statusTone
+  statusTone,
+  compact = false
 }: {
   item: MangaSeries;
   onClick: () => void;
   isDark: boolean;
   statusLabel?: string;
   statusTone?: 'owned' | 'missing';
+  compact?: boolean;
 }) {
   const lastOwned = Math.max(...item.ownedVolumes, 0);
   const isUpToDate = lastOwned === item.latestVolume && item.latestVolume > 0;
@@ -427,6 +620,51 @@ function SeriesCard({
 
   const statusStyle =
     statusTone === 'owned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
+
+  if (compact) {
+    return (
+      <motion.div
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className={`p-3 rounded-2xl border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'} cursor-pointer`}
+      >
+        <div className="w-full aspect-[3/4] rounded-lg overflow-hidden bg-zinc-200 dark:bg-zinc-800">
+          <ImageWithFallback
+            src={item.coverUrl}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="mt-2 min-w-0">
+          <div className="flex items-start justify-between gap-1">
+            <h3 className="text-sm font-bold leading-tight break-words">{item.title}</h3>
+            {item.isFavorite && <Heart size={14} className="text-red-500 fill-red-500 shrink-0" />}
+          </div>
+          <p className="text-[11px] text-zinc-500 truncate mt-1">{item.author}</p>
+          {metaLine && <p className="text-[10px] text-zinc-400 truncate mt-0.5">{metaLine}</p>}
+        </div>
+        <div className="mt-2 flex items-end justify-between gap-2">
+          <div className="text-xs font-bold">
+            {lastOwned}
+            <span className="text-zinc-400 text-[11px]"> / {item.latestVolume}</span>
+          </div>
+          {statusLabel && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusStyle}`}>
+              {statusLabel}
+            </span>
+          )}
+        </div>
+        {item.nextReleaseDate && !isUpToDate && (
+          <div
+            className={`mt-2 text-[10px] px-2 py-1 rounded-full inline-flex items-center gap-1 ${isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}
+          >
+            <Calendar size={10} />
+            {formatDate(item.nextReleaseDate)} 次巻
+          </div>
+        )}
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -693,24 +931,165 @@ function SeriesDetail({
   );
 }
 
-function SettingsView() {
+function SettingsView({
+  isDark,
+  settings,
+  settingsError,
+  googleDriveSyncing,
+  googleDriveSyncError,
+  googleDriveRestoring,
+  googleDriveRestoreError,
+  googleDriveBidirectionalSyncing,
+  googleDriveBidirectionalSyncError,
+  notificationPermission,
+  notificationSupported,
+  notificationStatusMessage,
+  onNotificationsChange,
+  onGoogleDriveSync,
+  onGoogleDriveRestore,
+  onGoogleDriveBidirectionalSync
+}: {
+  isDark: boolean;
+  settings: AppSettings;
+  settingsError: string | null;
+  googleDriveSyncing: boolean;
+  googleDriveSyncError: string | null;
+  googleDriveRestoring: boolean;
+  googleDriveRestoreError: string | null;
+  googleDriveBidirectionalSyncing: boolean;
+  googleDriveBidirectionalSyncError: string | null;
+  notificationPermission: NotificationPermissionState;
+  notificationSupported: boolean;
+  notificationStatusMessage: string;
+  onNotificationsChange: (enabled: boolean) => Promise<void>;
+  onGoogleDriveSync: () => Promise<void>;
+  onGoogleDriveRestore: () => Promise<void>;
+  onGoogleDriveBidirectionalSync: () => Promise<void>;
+}) {
+  const cardClass = isDark
+    ? 'rounded-xl border border-zinc-800 bg-zinc-900 p-4'
+    : 'rounded-xl border border-zinc-200 bg-white p-4';
+  const googleDriveBusy =
+    googleDriveSyncing || googleDriveRestoring || googleDriveBidirectionalSyncing;
+
+  const googleDriveSyncLabel = (() => {
+    const raw = settings.googleDriveLastSyncedAt;
+    if (!raw) return '未同期';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '未同期';
+    return new Intl.DateTimeFormat('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(parsed);
+  })();
+
+  const permissionLabel = (() => {
+    switch (notificationPermission) {
+      case 'granted':
+        return '許可済み';
+      case 'denied':
+        return '拒否';
+      case 'default':
+        return '未許可';
+      default:
+        return '未対応';
+    }
+  })();
+
   return (
     <div className="space-y-6 pt-4">
+      {settingsError && (
+        <div className="p-3 rounded-xl bg-rose-50 text-rose-600 text-sm">{settingsError}</div>
+      )}
+
       <section>
         <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">
           アカウント・データ
         </h3>
         <div className="space-y-2">
           <SettingsItem
+            isDark={isDark}
             icon={<CloudUpload className="text-blue-500" />}
-            title="Google Drive バックアップ"
-            description="前回の同期: 2026/02/01"
-            action={<button className="text-xs font-bold text-blue-500">同期する</button>}
+            title="Google Drive にバックアップ"
+            description={`保存先: Drive > MangaShelf / 前回同期: ${googleDriveSyncLabel}`}
+            action={
+              <button
+                type="button"
+                onClick={() => void onGoogleDriveSync()}
+                disabled={googleDriveBusy}
+                className={`text-xs font-bold ${googleDriveBusy ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+              >
+                {googleDriveSyncing ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    同期中
+                  </span>
+                ) : settings.googleDriveLinked ? (
+                  '同期する'
+                ) : (
+                  '連携して同期'
+                )}
+              </button>
+            }
           />
+          {googleDriveSyncError && (
+            <p className="px-1 text-[11px] text-rose-500">{googleDriveSyncError}</p>
+          )}
           <SettingsItem
+            isDark={isDark}
             icon={<ArrowUpDown className="text-zinc-400" />}
-            title="データのインポート/エクスポート"
+            title="Drive から復元"
+            description="最新バックアップで本棚データを置き換えます"
+            action={
+              <button
+                type="button"
+                onClick={() => void onGoogleDriveRestore()}
+                disabled={googleDriveBusy}
+                className={`text-xs font-bold ${googleDriveBusy ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+              >
+                {googleDriveRestoring ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    復元中
+                  </span>
+                ) : (
+                  '復元する'
+                )}
+              </button>
+            }
           />
+          {googleDriveRestoreError && (
+            <p className="px-1 text-[11px] text-rose-500">{googleDriveRestoreError}</p>
+          )}
+          <SettingsItem
+            isDark={isDark}
+            icon={<ArrowUpDown className="text-emerald-500" />}
+            title="Drive と双方向同期"
+            description="ID重複はローカル優先でマージし、Driveにも反映します"
+            action={
+              <button
+                type="button"
+                onClick={() => void onGoogleDriveBidirectionalSync()}
+                disabled={googleDriveBusy}
+                className={`text-xs font-bold ${googleDriveBusy ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+              >
+                {googleDriveBidirectionalSyncing ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    同期中
+                  </span>
+                ) : (
+                  '双方向同期'
+                )}
+              </button>
+            }
+          />
+          {googleDriveBidirectionalSyncError && (
+            <p className="px-1 text-[11px] text-rose-500">{googleDriveBidirectionalSyncError}</p>
+          )}
         </div>
       </section>
 
@@ -718,57 +1097,62 @@ function SettingsView() {
         <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">
           アプリ設定
         </h3>
-        <div className="space-y-2">
-          <SettingsItem
-            icon={<Bell size={20} className="text-orange-500" />}
-            title="通知設定"
-            description="新刊発売日の通知を受け取る"
-            action={
-              <div className="w-10 h-6 bg-green-500 rounded-full flex items-center justify-end px-1">
-                <div className="w-4 h-4 bg-white rounded-full" />
+        <div className="space-y-3">
+          <div className={cardClass}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h4 className="text-sm font-bold flex items-center gap-2">
+                  <Bell size={18} className="text-orange-500" /> 通知設定
+                </h4>
+                <p className="text-[11px] text-zinc-500 mt-1">新刊発売のブラウザ通知を受け取る</p>
               </div>
-            }
-          />
-          <SettingsItem
-            icon={<Filter size={20} className="text-zinc-400" />}
-            title="表示設定"
-            description="巻数の並び順やグリッド数"
-          />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.notificationsEnabled}
+                aria-label="通知設定"
+                disabled={!notificationSupported}
+                onClick={() => void onNotificationsChange(!settings.notificationsEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings.notificationsEnabled ? 'bg-green-500' : 'bg-zinc-300'
+                } ${notificationSupported ? '' : 'opacity-50 cursor-not-allowed'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings.notificationsEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-2">権限状態: {permissionLabel}</p>
+            <p className="text-[11px] text-zinc-500 mt-1">{notificationStatusMessage}</p>
+          </div>
         </div>
       </section>
-
-      <section>
-        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">データ</h3>
-        <div className="space-y-2">
-          <SettingsItem
-            icon={<Library size={18} className="text-zinc-400" />}
-            title="データソース"
-            description="国立国会図書館サーチ API"
-          />
-        </div>
-      </section>
-
-      <div className="mt-8 p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-center">
-        <p className="text-xs text-zinc-500">Manga Shelf v1.0.0</p>
-      </div>
     </div>
   );
 }
 
 function SettingsItem({
+  isDark,
   icon,
   title,
   description,
   action
 }: {
+  isDark: boolean;
   icon: React.ReactNode;
   title: string;
   description?: string;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
-      <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800">{icon}</div>
+    <div
+      className={`flex items-center gap-4 p-3 rounded-xl border ${
+        isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-100'
+      }`}
+    >
+      <div className={`p-2 rounded-lg ${isDark ? 'bg-zinc-800' : 'bg-zinc-50'}`}>{icon}</div>
       <div className="flex-1 min-w-0">
         <h4 className="text-sm font-bold truncate">{title}</h4>
         {description && <p className="text-[11px] text-zinc-500 truncate">{description}</p>}

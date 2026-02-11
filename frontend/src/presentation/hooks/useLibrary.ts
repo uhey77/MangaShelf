@@ -51,5 +51,10 @@ export function useLibrary() {
     [upsertLibraryItem]
   );
 
-  return { library, libraryError, updateSeries };
+  const replaceLibrary = useCallback((items: MangaSeries[]) => {
+    setLibrary(items);
+    setLibraryError(null);
+  }, []);
+
+  return { library, libraryError, updateSeries, replaceLibrary };
 }
