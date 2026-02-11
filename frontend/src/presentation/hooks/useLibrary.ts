@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { MangaSeries } from '@domain/entities/MangaSeries';
+import { deduplicateSeriesByKey } from '@domain/services/seriesMerge';
 import { useAppContainer } from '@presentation/providers/AppProvider';
 
 const LOAD_ERROR_MESSAGE = '本棚データの読み込みに失敗しました';
@@ -18,7 +19,7 @@ export function useLibrary() {
       try {
         const items = await getLibrary.handle();
         if (!active) return;
-        setLibrary(items);
+        setLibrary(deduplicateSeriesByKey(items));
         setLibraryError(null);
       } catch {
         if (!active) return;
@@ -37,9 +38,8 @@ export function useLibrary() {
       try {
         const saved = await upsertLibraryItem.handle({ item: updated });
         setLibrary((prev) => {
-          const exists = prev.some((item) => item.id === saved.id);
-          if (!exists) return [...prev, saved];
-          return prev.map((item) => (item.id === saved.id ? saved : item));
+          const remaining = prev.filter((item) => item.id !== saved.id);
+          return deduplicateSeriesByKey([saved, ...remaining]);
         });
         setLibraryError(null);
         return saved;
@@ -52,7 +52,7 @@ export function useLibrary() {
   );
 
   const replaceLibrary = useCallback((items: MangaSeries[]) => {
-    setLibrary(items);
+    setLibrary(deduplicateSeriesByKey(items));
     setLibraryError(null);
   }, []);
 

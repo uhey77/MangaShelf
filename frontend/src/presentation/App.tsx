@@ -25,14 +25,21 @@ import { AnimatePresence, motion } from 'motion/react';
 
 import { AppSettings, ShelfGridColumns, ShelfSort } from '@domain/entities/AppSettings';
 import { MangaSeries } from '@domain/entities/MangaSeries';
+import {
+  buildSeriesKey,
+  extractVolumeNumber,
+  toSeriesDisplayTitle
+} from '@domain/services/seriesIdentity';
 import { ImageWithFallback } from '@components/figma/ImageWithFallback';
 import { useAppSettings } from '@presentation/hooks/useAppSettings';
 import { useLibrary } from '@presentation/hooks/useLibrary';
+import { useAppContainer } from '@presentation/providers/AppProvider';
 import { useSearch } from '@presentation/hooks/useSearch';
 import { buildMetaLine, formatDate } from '@presentation/utils/formatters';
 
 type ActiveTab = 'shelf' | 'search' | 'favorites' | 'settings';
 type NotificationPermissionState = NotificationPermission | 'unsupported';
+type SeriesLibraryStatus = 'notInLibrary' | 'sameSeriesDifferentId' | 'sameId';
 
 function sortLibraryItems(items: MangaSeries[], sort: ShelfSort): MangaSeries[] {
   const sorted = [...items];
@@ -98,10 +105,13 @@ export default function App() {
   const isDark = settings.themeMode === 'dark';
 
   const libraryIndex = useMemo(() => new Map(library.map((item) => [item.id, item])), [library]);
+  const librarySeriesIndex = useMemo(
+    () => new Map(library.map((item) => [buildSeriesKey(item.title, item.author), item])),
+    [library]
+  );
 
   const selectSeriesFromSearch = (item: MangaSeries) => {
-    const saved = libraryIndex.get(item.id);
-    setSelectedSeries(saved ?? item);
+    setSelectedSeries(item);
   };
 
   const handleUpdateSeries = (updated: MangaSeries) => {
@@ -138,6 +148,19 @@ export default function App() {
   const totalSearchPages = Math.max(1, Math.ceil(Math.min(searchTotal, 500) / searchLimit));
   const shelfGridClass = settings.shelfGridColumns === 2 ? 'grid-cols-2' : 'grid-cols-1';
   const useCompactShelfCard = settings.shelfGridColumns === 2;
+  const selectedSeriesStatus = useMemo<SeriesLibraryStatus>(() => {
+    if (!selectedSeries) {
+      return 'notInLibrary';
+    }
+    if (libraryIndex.has(selectedSeries.id)) {
+      return 'sameId';
+    }
+    const key = buildSeriesKey(selectedSeries.title, selectedSeries.author);
+    if (librarySeriesIndex.has(key)) {
+      return 'sameSeriesDifferentId';
+    }
+    return 'notInLibrary';
+  }, [selectedSeries, libraryIndex, librarySeriesIndex]);
 
   return (
     <div
@@ -336,7 +359,9 @@ export default function App() {
                   {searchResults.length > 0 && (
                     <div className="grid grid-cols-1 gap-4">
                       {searchResults.map((item) => {
-                        const isInLibrary = libraryIndex.has(item.id);
+                        const isInLibrary = librarySeriesIndex.has(
+                          buildSeriesKey(item.title, item.author)
+                        );
                         return (
                           <SeriesCard
                             key={item.id}
@@ -394,6 +419,7 @@ export default function App() {
                         onClick={() => setSelectedSeries(item)}
                         isDark={isDark}
                         compact={useCompactShelfCard}
+                        seriesTitleOnly
                       />
                     ))}
                     {filteredLibrary.length === 0 && (
@@ -412,7 +438,8 @@ export default function App() {
               onBack={() => setSelectedSeries(null)}
               onUpdate={handleUpdateSeries}
               isDark={isDark}
-              isInLibrary={libraryIndex.has(selectedSeries.id)}
+              libraryStatus={selectedSeriesStatus}
+              seriesTitleOnly={activeTab !== 'search'}
             />
           )}
         </AnimatePresence>
@@ -605,7 +632,8 @@ function SeriesCard({
   isDark,
   statusLabel,
   statusTone,
-  compact = false
+  compact = false,
+  seriesTitleOnly = false
 }: {
   item: MangaSeries;
   onClick: () => void;
@@ -613,10 +641,17 @@ function SeriesCard({
   statusLabel?: string;
   statusTone?: 'owned' | 'missing';
   compact?: boolean;
+  seriesTitleOnly?: boolean;
 }) {
-  const lastOwned = Math.max(...item.ownedVolumes, 0);
-  const isUpToDate = lastOwned === item.latestVolume && item.latestVolume > 0;
-  const metaLine = buildMetaLine(item.publisher, item.publishedDate);
+  const displayTitle = seriesTitleOnly ? toSeriesDisplayTitle(item.title) : item.title;
+  const ownedCount = item.ownedVolumes.length;
+  const isUpToDate =
+    item.latestVolume > 0 &&
+    ownedCount === item.latestVolume &&
+    item.ownedVolumes.every((volume, index) => volume === index + 1);
+  const metaLine = seriesTitleOnly
+    ? (item.publisher ?? '').trim()
+    : buildMetaLine(item.publisher, item.publishedDate);
 
   const statusStyle =
     statusTone === 'owned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
@@ -637,7 +672,7 @@ function SeriesCard({
         </div>
         <div className="mt-2 min-w-0">
           <div className="flex items-start justify-between gap-1">
-            <h3 className="text-sm font-bold leading-tight break-words">{item.title}</h3>
+            <h3 className="text-sm font-bold leading-tight break-words">{displayTitle}</h3>
             {item.isFavorite && <Heart size={14} className="text-red-500 fill-red-500 shrink-0" />}
           </div>
           <p className="text-[11px] text-zinc-500 truncate mt-1">{item.author}</p>
@@ -645,7 +680,7 @@ function SeriesCard({
         </div>
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="text-xs font-bold">
-            {lastOwned}
+            {ownedCount}
             <span className="text-zinc-400 text-[11px]"> / {item.latestVolume}</span>
           </div>
           {statusLabel && (
@@ -682,7 +717,7 @@ function SeriesCard({
       <div className="flex-1 flex flex-col justify-between min-w-0">
         <div>
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-bold truncate">{item.title}</h3>
+            <h3 className="font-bold truncate">{displayTitle}</h3>
             <div className="flex items-center gap-2">
               {statusLabel && (
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusStyle}`}>
@@ -712,7 +747,7 @@ function SeriesCard({
           <div className="flex flex-col">
             <span className="text-[10px] text-zinc-500 uppercase tracking-wider">所持巻数</span>
             <div className="flex items-center gap-1.5">
-              <span className="text-lg font-bold">{lastOwned}</span>
+              <span className="text-lg font-bold">{ownedCount}</span>
               <span className="text-zinc-400 text-xs">/ {item.latestVolume}</span>
               {isUpToDate ? (
                 <CheckCircle2 size={14} className="text-green-500" />
@@ -740,15 +775,23 @@ function SeriesDetail({
   onBack,
   onUpdate,
   isDark,
-  isInLibrary
+  libraryStatus,
+  seriesTitleOnly
 }: {
   series: MangaSeries;
   onBack: () => void;
   onUpdate: (s: MangaSeries) => void;
   isDark: boolean;
-  isInLibrary: boolean;
+  libraryStatus: SeriesLibraryStatus;
+  seriesTitleOnly?: boolean;
 }) {
+  const { searchBooks } = useAppContainer();
   const [noteText, setNoteText] = useState(series.notes);
+  const [volumeCoverByVolume, setVolumeCoverByVolume] = useState<Record<number, string>>({});
+  const displayTitle = seriesTitleOnly ? toSeriesDisplayTitle(series.title) : series.title;
+  const detailMetaLine = seriesTitleOnly
+    ? (series.publisher ?? '').trim()
+    : buildMetaLine(series.publisher, series.publishedDate);
   const sourceLabel = (() => {
     switch (series.source) {
       case 'ndl':
@@ -765,6 +808,56 @@ function SeriesDetail({
   useEffect(() => {
     setNoteText(series.notes);
   }, [series.id, series.notes]);
+
+  useEffect(() => {
+    const seed: Record<number, string> = {};
+    const currentVolume = extractVolumeNumber(series.title);
+    if (currentVolume && series.coverUrl) {
+      seed[currentVolume] = series.coverUrl;
+    }
+    setVolumeCoverByVolume(seed);
+
+    const baseTitle = toSeriesDisplayTitle(series.title).trim();
+    if (!baseTitle) {
+      return;
+    }
+
+    let active = true;
+    const loadVolumeCovers = async () => {
+      try {
+        const result = await searchBooks.handle({
+          title: baseTitle,
+          author: series.author.trim() || undefined,
+          page: 1,
+          limit: 120
+        });
+        if (!active) {
+          return;
+        }
+
+        const discovered: Record<number, string> = {};
+        for (const item of result.items) {
+          if (!item.coverUrl) {
+            continue;
+          }
+          const volume = extractVolumeNumber(item.title);
+          if (!volume || discovered[volume]) {
+            continue;
+          }
+          discovered[volume] = item.coverUrl;
+        }
+
+        setVolumeCoverByVolume((prev) => ({ ...discovered, ...prev }));
+      } catch {
+        // 巻別画像の補完失敗時は既存表示を維持する
+      }
+    };
+
+    void loadVolumeCovers();
+    return () => {
+      active = false;
+    };
+  }, [searchBooks, series.id, series.title, series.author, series.coverUrl]);
 
   const toggleVolume = (vol: number) => {
     let newOwned = [...series.ownedVolumes];
@@ -798,7 +891,7 @@ function SeriesDetail({
         >
           <ChevronLeft size={24} />
         </button>
-        <h2 className="font-bold truncate px-4">{series.title}</h2>
+        <h2 className="font-bold truncate px-4">{displayTitle}</h2>
         <button
           onClick={() => onUpdate({ ...series, isFavorite: !series.isFavorite })}
           className={`p-2 rounded-full ${series.isFavorite ? 'text-red-500' : 'text-zinc-400'}`}
@@ -813,21 +906,19 @@ function SeriesDetail({
           <div className="w-28 h-40 rounded-xl overflow-hidden shadow-lg flex-shrink-0">
             <ImageWithFallback
               src={series.coverUrl}
-              alt={series.title}
+              alt={displayTitle}
               className="w-full h-full object-cover"
             />
           </div>
           <div className="flex flex-col justify-center">
-            <h3 className="text-lg font-bold">{series.title}</h3>
+            <h3 className="text-lg font-bold">{displayTitle}</h3>
             <p className="text-zinc-500">{series.author}</p>
-            {buildMetaLine(series.publisher, series.publishedDate) && (
-              <p className="text-xs text-zinc-500 mt-1">
-                {buildMetaLine(series.publisher, series.publishedDate)}
-              </p>
+            {detailMetaLine && <p className="text-xs text-zinc-500 mt-1">{detailMetaLine}</p>}
+            {!seriesTitleOnly && series.isbn && (
+              <p className="text-xs text-zinc-400 mt-1">ISBN: {series.isbn}</p>
             )}
-            {series.isbn && <p className="text-xs text-zinc-400 mt-1">ISBN: {series.isbn}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
-              {series.sourceUrl && (
+              {!seriesTitleOnly && series.sourceUrl && (
                 <a
                   href={series.sourceUrl}
                   target="_blank"
@@ -837,15 +928,16 @@ function SeriesDetail({
                   {sourceLabel} <ExternalLink size={12} />
                 </a>
               )}
-              {!isInLibrary && (
+              {libraryStatus !== 'sameId' && (
                 <button
                   onClick={() => onUpdate({ ...series })}
                   className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-emerald-500 text-white font-medium hover:bg-emerald-600 transition-colors"
                 >
-                  本棚に追加 <Plus size={12} />
+                  {libraryStatus === 'sameSeriesDifferentId' ? 'この巻を所持に反映' : '本棚に追加'}{' '}
+                  <Plus size={12} />
                 </button>
               )}
-              {isInLibrary && (
+              {libraryStatus === 'sameId' && (
                 <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600">
                   本棚に追加済み
                 </span>
@@ -876,19 +968,47 @@ function SeriesDetail({
             {Array.from({ length: series.latestVolume }).map((_, i) => {
               const vol = i + 1;
               const isOwned = series.ownedVolumes.includes(vol);
+              const coverUrl = volumeCoverByVolume[vol];
               return (
                 <button
                   key={vol}
                   onClick={() => toggleVolume(vol)}
-                  className={`aspect-square rounded-lg flex items-center justify-center text-sm font-bold transition-all border ${
-                    isOwned
-                      ? 'bg-blue-500 border-blue-600 text-white'
-                      : isDark
-                        ? 'bg-zinc-900 border-zinc-800 text-zinc-500'
-                        : 'bg-white border-zinc-200 text-zinc-400'
-                  }`}
+                  aria-label={`${vol}巻`}
+                  className={
+                    coverUrl
+                      ? `relative aspect-square overflow-hidden rounded-lg transition-all border ${
+                          isOwned
+                            ? 'border-blue-500 ring-2 ring-blue-500/60'
+                            : isDark
+                              ? 'border-zinc-700'
+                              : 'border-zinc-200'
+                        }`
+                      : `aspect-square rounded-lg flex items-center justify-center text-sm font-bold transition-all border ${
+                          isOwned
+                            ? 'bg-blue-500 border-blue-600 text-white'
+                            : isDark
+                              ? 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                              : 'bg-white border-zinc-200 text-zinc-400'
+                        }`
+                  }
                 >
-                  {vol}
+                  {coverUrl ? (
+                    <>
+                      <ImageWithFallback
+                        src={coverUrl}
+                        alt={`${displayTitle} ${vol}巻`}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <div
+                        className={`absolute inset-0 ${isOwned ? 'bg-blue-900/20' : 'bg-black/30'}`}
+                      />
+                      <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                        {vol}
+                      </span>
+                    </>
+                  ) : (
+                    vol
+                  )}
                 </button>
               );
             })}
@@ -1068,7 +1188,7 @@ function SettingsView({
             isDark={isDark}
             icon={<ArrowUpDown className="text-emerald-500" />}
             title="Drive と双方向同期"
-            description="ID重複はローカル優先でマージし、Driveにも反映します"
+            description="シリーズ重複はローカル優先でマージし、Driveにも反映します"
             action={
               <button
                 type="button"
