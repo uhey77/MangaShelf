@@ -111,6 +111,11 @@ export default function App() {
   );
 
   const selectSeriesFromSearch = (item: MangaSeries) => {
+    const libraryItem = libraryIndex.get(item.id);
+    if (libraryItem) {
+      setSelectedSeries(libraryItem);
+      return;
+    }
     setSelectedSeries(item);
   };
 
