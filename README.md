@@ -30,6 +30,7 @@
 │   │   │   ├── models.py
 │   │   │   ├── repositories.py
 │   │   │   ├── search.py
+│   │   │   ├── series_identity.py
 │   │   │   └── services.py
 │   │   ├── infrastructure/
 │   │   │   ├── __init__.py
@@ -80,6 +81,9 @@
 │       │   │   ├── GoogleDriveBackupRepository.ts
 │       │   │   ├── LibraryRepository.ts
 │       │   │   └── SearchRepository.ts
+│       │   ├── services/
+│       │   │   ├── seriesIdentity.ts
+│       │   │   └── seriesMerge.ts
 │       │   └── search.ts
 │       ├── application/
 │       │   ├── commands/
@@ -166,6 +170,7 @@
 | `backend/src/domain/models.py` | ドメインモデル。 |
 | `backend/src/domain/repositories.py` | リポジトリ抽象。 |
 | `backend/src/domain/search.py` | 検索ドメインの型（検索期間は `date`）。 |
+| `backend/src/domain/series_identity.py` | シリーズ同一判定キー生成と巻数抽出ロジック。 |
 | `backend/src/domain/services.py` | ドメインサービス抽象。 |
 | `backend/src/infrastructure/` | インフラ層（外部API・永続化）。 |
 | `backend/src/infrastructure/__init__.py` | インフラ層のパッケージ定義。 |
@@ -212,6 +217,9 @@
 | `frontend/src/domain/repositories/` | リポジトリ抽象。 |
 | `frontend/src/domain/repositories/AppSettingsRepository.ts` | アプリ設定リポジトリ抽象。 |
 | `frontend/src/domain/repositories/GoogleDriveBackupRepository.ts` | Google Drive バックアップ用リポジトリ抽象。 |
+| `frontend/src/domain/services/` | シリーズ判定・マージなどのドメインサービス。 |
+| `frontend/src/domain/services/seriesIdentity.ts` | シリーズキー生成と巻数抽出ロジック。 |
+| `frontend/src/domain/services/seriesMerge.ts` | シリーズ単位の重複統合・マージロジック。 |
 | `frontend/src/domain/search.ts` | 検索クエリ・検索結果の型。 |
 | `frontend/src/application/` | アプリケーション層（ユースケース）。 |
 | `frontend/src/application/commands/` | コマンド（書き込みユースケース）。 |

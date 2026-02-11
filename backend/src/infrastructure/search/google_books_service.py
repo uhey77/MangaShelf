@@ -8,6 +8,7 @@ import requests
 from domain.errors import SearchServiceError
 from domain.models import LibraryItem
 from domain.search import SearchQuery, SearchResult
+from domain.series_identity import extract_volume_number
 from domain.services import BookSearchService
 
 MAX_RESULTS = 40
@@ -121,6 +122,7 @@ def build_items(raw_items: List[dict[str, Any]]) -> List[LibraryItem]:
         genre = [str(c).strip() for c in categories if str(c).strip()]
         info_link = str(volume.get("infoLink") or "").strip() or None
         item_id = build_google_id(raw, title, author)
+        latest_volume = extract_volume_number(title) or 1
 
         items.append(
             LibraryItem(
@@ -129,7 +131,7 @@ def build_items(raw_items: List[dict[str, Any]]) -> List[LibraryItem]:
                 author=author,
                 publisher=publisher,
                 published_date=published_date,
-                latest_volume=1,
+                latest_volume=latest_volume,
                 owned_volumes=[],
                 next_release_date=None,
                 is_favorite=False,

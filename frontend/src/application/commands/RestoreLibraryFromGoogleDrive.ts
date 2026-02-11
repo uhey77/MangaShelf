@@ -1,20 +1,13 @@
 import { MangaSeries } from '@domain/entities/MangaSeries';
 import { GoogleDriveBackupRepository } from '@domain/repositories/GoogleDriveBackupRepository';
 import { LibraryRepository } from '@domain/repositories/LibraryRepository';
+import { deduplicateSeriesByKey } from '@domain/services/seriesMerge';
 
 export interface RestoreLibraryFromGoogleDriveResult {
   restoredItems: MangaSeries[];
   sourceFileId: string;
   sourceFileName: string;
   restoredFrom: string;
-}
-
-function deduplicateById(items: MangaSeries[]): MangaSeries[] {
-  const uniqueMap = new Map<string, MangaSeries>();
-  for (const item of items) {
-    uniqueMap.set(item.id, item);
-  }
-  return Array.from(uniqueMap.values());
 }
 
 export class RestoreLibraryFromGoogleDrive {
@@ -29,16 +22,17 @@ export class RestoreLibraryFromGoogleDrive {
       throw new Error('Google Drive に復元可能なバックアップがありません。');
     }
 
-    const backupItems = deduplicateById(backup.items);
-    const currentItems = await this.libraryRepository.list();
-    const backupIds = new Set(backupItems.map((item) => item.id));
+    const backupItems = deduplicateSeriesByKey(backup.items);
+    const savedIds = new Set<string>();
 
     for (const item of backupItems) {
-      await this.libraryRepository.upsert(item);
+      const saved = await this.libraryRepository.upsert(item);
+      savedIds.add(saved.id);
     }
 
-    for (const current of currentItems) {
-      if (!backupIds.has(current.id)) {
+    const itemsAfterUpsert = await this.libraryRepository.list();
+    for (const current of itemsAfterUpsert) {
+      if (!savedIds.has(current.id)) {
         await this.libraryRepository.delete(current.id);
       }
     }
