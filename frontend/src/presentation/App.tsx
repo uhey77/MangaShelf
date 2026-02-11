@@ -60,13 +60,16 @@ export default function App() {
   const {
     settings,
     settingsError,
+    googleDriveSyncing,
+    googleDriveSyncError,
     notificationPermission,
     notificationSupported,
     notificationStatusMessage,
     toggleThemeMode,
     setShelfSort,
     setShelfGridColumns,
-    setNotificationsEnabled
+    setNotificationsEnabled,
+    syncGoogleDriveBackup
   } = useAppSettings(library);
   const {
     searchForm,
@@ -282,10 +285,13 @@ export default function App() {
                   isDark={isDark}
                   settings={settings}
                   settingsError={settingsError}
+                  googleDriveSyncing={googleDriveSyncing}
+                  googleDriveSyncError={googleDriveSyncError}
                   notificationPermission={notificationPermission}
                   notificationSupported={notificationSupported}
                   notificationStatusMessage={notificationStatusMessage}
                   onNotificationsChange={setNotificationsEnabled}
+                  onGoogleDriveSync={syncGoogleDriveBackup}
                 />
               ) : activeTab === 'search' ? (
                 <div className="space-y-4">
@@ -914,22 +920,42 @@ function SettingsView({
   isDark,
   settings,
   settingsError,
+  googleDriveSyncing,
+  googleDriveSyncError,
   notificationPermission,
   notificationSupported,
   notificationStatusMessage,
-  onNotificationsChange
+  onNotificationsChange,
+  onGoogleDriveSync
 }: {
   isDark: boolean;
   settings: AppSettings;
   settingsError: string | null;
+  googleDriveSyncing: boolean;
+  googleDriveSyncError: string | null;
   notificationPermission: NotificationPermissionState;
   notificationSupported: boolean;
   notificationStatusMessage: string;
   onNotificationsChange: (enabled: boolean) => Promise<void>;
+  onGoogleDriveSync: () => Promise<void>;
 }) {
   const cardClass = isDark
     ? 'rounded-xl border border-zinc-800 bg-zinc-900 p-4'
     : 'rounded-xl border border-zinc-200 bg-white p-4';
+
+  const googleDriveSyncLabel = (() => {
+    const raw = settings.googleDriveLastSyncedAt;
+    if (!raw) return '未同期';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '未同期';
+    return new Intl.DateTimeFormat('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(parsed);
+  })();
 
   const permissionLabel = (() => {
     switch (notificationPermission) {
@@ -958,9 +984,30 @@ function SettingsView({
           <SettingsItem
             icon={<CloudUpload className="text-blue-500" />}
             title="Google Drive バックアップ"
-            description="準備中"
-            action={<span className="text-xs font-semibold text-zinc-400">準備中</span>}
+            description={`前回同期: ${googleDriveSyncLabel}`}
+            action={
+              <button
+                type="button"
+                onClick={() => void onGoogleDriveSync()}
+                disabled={googleDriveSyncing}
+                className={`text-xs font-bold ${googleDriveSyncing ? 'text-zinc-400' : 'text-blue-500 hover:underline'}`}
+              >
+                {googleDriveSyncing ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    同期中
+                  </span>
+                ) : settings.googleDriveLinked ? (
+                  '同期する'
+                ) : (
+                  '連携して同期'
+                )}
+              </button>
+            }
           />
+          {googleDriveSyncError && (
+            <p className="px-1 text-[11px] text-rose-500">{googleDriveSyncError}</p>
+          )}
           <SettingsItem
             icon={<ArrowUpDown className="text-zinc-400" />}
             title="データのインポート/エクスポート"

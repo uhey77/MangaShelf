@@ -23,6 +23,10 @@ function isShelfGridColumns(value: unknown): value is ShelfGridColumns {
   return value === 1 || value === 2;
 }
 
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
 function toAppSettings(value: unknown): AppSettings {
   if (!value || typeof value !== 'object') {
     return { ...DEFAULT_APP_SETTINGS };
@@ -38,7 +42,14 @@ function toAppSettings(value: unknown): AppSettings {
     shelfSort: isShelfSort(stored.shelfSort) ? stored.shelfSort : DEFAULT_APP_SETTINGS.shelfSort,
     shelfGridColumns: isShelfGridColumns(stored.shelfGridColumns)
       ? stored.shelfGridColumns
-      : DEFAULT_APP_SETTINGS.shelfGridColumns
+      : DEFAULT_APP_SETTINGS.shelfGridColumns,
+    googleDriveLinked:
+      typeof stored.googleDriveLinked === 'boolean'
+        ? stored.googleDriveLinked
+        : DEFAULT_APP_SETTINGS.googleDriveLinked,
+    googleDriveLastSyncedAt: isNullableString(stored.googleDriveLastSyncedAt)
+      ? stored.googleDriveLastSyncedAt
+      : DEFAULT_APP_SETTINGS.googleDriveLastSyncedAt
   };
 }
 

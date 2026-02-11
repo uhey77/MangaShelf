@@ -12,6 +12,7 @@ import { useAppContainer } from '@presentation/providers/AppProvider';
 
 const LOAD_ERROR_MESSAGE = '設定の読み込みに失敗しました';
 const SAVE_ERROR_MESSAGE = '設定の保存に失敗しました';
+const GOOGLE_DRIVE_SYNC_ERROR_MESSAGE = 'Google Driveとの同期に失敗しました';
 const APP_NOTIFICATION_KEY = 'manga_shelf.release_notifications.v1';
 const NOTIFICATION_WINDOW_DAYS = 7;
 
@@ -85,10 +86,12 @@ function toReleaseKey(series: MangaSeries): string | null {
 }
 
 export function useAppSettings(library: MangaSeries[]) {
-  const { getAppSettings, saveAppSettings } = useAppContainer();
+  const { getAppSettings, saveAppSettings, syncLibraryToGoogleDrive } = useAppContainer();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [googleDriveSyncing, setGoogleDriveSyncing] = useState(false);
+  const [googleDriveSyncError, setGoogleDriveSyncError] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(
     () => getNotificationPermissionState()
   );
@@ -244,6 +247,28 @@ export function useAppSettings(library: MangaSeries[]) {
     setSettings((prev) => ({ ...prev, notificationsEnabled: false }));
   }, []);
 
+  const syncGoogleDriveBackup = useCallback(async () => {
+    setGoogleDriveSyncing(true);
+    setGoogleDriveSyncError(null);
+
+    try {
+      const result = await syncLibraryToGoogleDrive.handle({ items: library });
+      setSettings((prev) => ({
+        ...prev,
+        googleDriveLinked: true,
+        googleDriveLastSyncedAt: result.syncedAt
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setGoogleDriveSyncError(error.message);
+      } else {
+        setGoogleDriveSyncError(GOOGLE_DRIVE_SYNC_ERROR_MESSAGE);
+      }
+    } finally {
+      setGoogleDriveSyncing(false);
+    }
+  }, [library, syncLibraryToGoogleDrive]);
+
   const notificationSupported = notificationPermission !== 'unsupported';
 
   const notificationStatusMessage = useMemo(() => {
@@ -262,6 +287,8 @@ export function useAppSettings(library: MangaSeries[]) {
   return {
     settings,
     settingsError,
+    googleDriveSyncing,
+    googleDriveSyncError,
     notificationPermission,
     notificationSupported,
     notificationStatusMessage,
@@ -269,6 +296,7 @@ export function useAppSettings(library: MangaSeries[]) {
     toggleThemeMode,
     setShelfSort,
     setShelfGridColumns,
-    setNotificationsEnabled
+    setNotificationsEnabled,
+    syncGoogleDriveBackup
   };
 }
