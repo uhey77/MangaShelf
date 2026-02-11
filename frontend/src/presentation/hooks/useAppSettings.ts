@@ -192,11 +192,6 @@ export function useAppSettings({ library, onLibraryReplace }: UseAppSettingsPara
         continue;
       }
 
-      const hasUnownedVolume = series.ownedVolumes.length < series.latestVolume;
-      if (!hasUnownedVolume) {
-        continue;
-      }
-
       try {
         new Notification('Manga Shelf 新刊通知', {
           body: `${series.title} の次巻発売日が近づいています（${series.nextReleaseDate.replace(/-/g, '/')}）`
